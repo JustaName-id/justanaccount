@@ -3,8 +3,9 @@ pragma solidity ^0.8.4;
 
 import { Receiver } from "@solady/accounts/Receiver.sol";
 import { ECDSA } from "@solady/utils/ECDSA.sol";
-import { LibBit } from "solady/utils/LibBit.sol";
-import { WebAuthn } from "solady/utils/WebAuthn.sol";
+import { EIP712 } from "@solady/utils/EIP712.sol";
+import { LibBit } from "@solady/utils/LibBit.sol";
+import { WebAuthn } from "@solady/utils/WebAuthn.sol";
 
 import { BaseAccount } from "@account-abstraction/core/BaseAccount.sol";
 import { SIG_VALIDATION_FAILED, SIG_VALIDATION_SUCCESS } from "@account-abstraction/core/Helpers.sol";
@@ -23,9 +24,17 @@ import { MultiOwnable } from "./MultiOwnable.sol";
  * @title JustanAccount
  * @notice This contract is to be used via EIP-7702 delegation and supports ERC-4337
  */
-contract JustanAccount is BaseAccount, MultiOwnable, IERC165, IERC1271, Receiver {
+contract JustanAccount is BaseAccount, MultiOwnable, IERC165, IERC1271, Receiver, EIP712 {
 
     error JustanAccount_AlreadyInitialized();
+
+    struct SignatureWrapper {
+        /// @dev The index of the owner that signed, see `MultiOwnable.ownerAtIndex`
+        uint256 ownerIndex;
+        /// @dev If `MultiOwnable.ownerAtIndex` is an Ethereum address, this should be `abi.encodePacked(r, s, v)`
+        ///      If `MultiOwnable.ownerAtIndex` is a public key, this should be `abi.encode(WebAuthnAuth)`.
+        bytes signatureData;
+    }
 
     /**
      * @notice The entrypoint used by this account.
@@ -60,7 +69,7 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, IERC1271, Receiver
      * @return result The result of the signature validation.
      */
     function isValidSignature(bytes32 hash, bytes calldata signature) external view returns (bytes4 result) {
-        bool success = _checkSignature(hash, signature);
+        bool success = _checkSignature({ hash: replaySafeHash(hash), signature: signature });
         assembly {
             // `success ? bytes4(keccak256("isValidSignature(bytes32,bytes)")) : 0xffffffff`.
             // We use `0xffffffff` for invalid, in convention with the reference implementation.
@@ -94,6 +103,21 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, IERC1271, Receiver
     }
 
     /**
+     * @notice Produces a replay-safe hash from the given `hash`.
+     * @dev The returned EIP-712 compliant replay-safe hash is the result of:
+     *      keccak256(
+     *         \x19\x01 ||
+     *         this.domainSeparator ||
+     *         hashStruct(JustanAccount({ hash: `hash`}))
+     *      )
+     * @param hash The original hash.
+     * @return The corresponding replay-safe hash.
+     */
+    function replaySafeHash(bytes32 hash) public view virtual returns (bytes32) {
+        return _hashTypedData(hash);
+    }
+
+    /**
      * @notice Validates the signature of the account.
      * @dev Called by the entry point.
      * @param userOp The user operation.
@@ -117,8 +141,10 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, IERC1271, Receiver
      * @dev Checks whether the recovered address is equal to the account address or is an owner of this account.
      */
     function _checkSignature(bytes32 hash, bytes calldata signature) internal view returns (bool) {
-        if (LibBit.or(signature.length == 64, signature.length == 65)) {
-            address recovered = ECDSA.tryRecoverCalldata(hash, signature);
+        SignatureWrapper memory sigWrapper = abi.decode(signature, (SignatureWrapper));
+
+        if (LibBit.or(sigWrapper.signatureData.length == 64, sigWrapper.signatureData.length == 65)) {
+            address recovered = ECDSA.tryRecover(hash, sigWrapper.signatureData);
             return (recovered != address(0) && (recovered == address(this) || isOwnerAddress(recovered)));
         }
 
@@ -132,29 +158,24 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, IERC1271, Receiver
      * @return True if signature is valid for any registered WebAuthn key.
      */
     function _checkWebAuthnSignature(bytes32 hash, bytes calldata signature) internal view returns (bool) {
-        uint256 nextIndex = nextOwnerIndex();
+        SignatureWrapper memory sigWrapper = abi.decode(signature, (SignatureWrapper));
 
-        if (nextIndex == 0) {
-            return false; // No owners registered
+        // Check if owner index is valid
+        if (sigWrapper.ownerIndex >= nextOwnerIndex()) {
+            return false;
         }
 
-        // Get all owners and check WebAuthn keys (64-byte public keys)
-        for (uint256 i = 0; i < nextIndex; i++) {
-            bytes memory ownerBytes = ownerAtIndex(i);
+        bytes memory ownerBytes = ownerAtIndex(sigWrapper.ownerIndex);
 
-            // Skip if not a WebAuthn key (64 bytes) or if owner was removed
-            if (ownerBytes.length != 64 || !isOwnerBytes(ownerBytes)) {
-                continue;
-            }
-
-            // Decode public key coordinates
-            (bytes32 x, bytes32 y) = abi.decode(ownerBytes, (bytes32, bytes32));
-
-            // Verify WebAuthn signature
-            return _verifyWebAuthnSignature(hash, signature, x, y);
+        // Check if it's a valid WebAuthn key (64 bytes) and is still an owner
+        if (ownerBytes.length != 64 || !isOwnerBytes(ownerBytes)) {
+            return false;
         }
 
-        return false;
+        // Decode public key coordinates
+        (bytes32 x, bytes32 y) = abi.decode(ownerBytes, (bytes32, bytes32));
+
+        return _verifyWebAuthnSignature(hash, sigWrapper.signatureData, x, y);
     }
 
     /**
@@ -167,7 +188,7 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, IERC1271, Receiver
      */
     function _verifyWebAuthnSignature(
         bytes32 hash,
-        bytes calldata signature,
+        bytes memory signature,
         bytes32 x,
         bytes32 y
     )
@@ -175,13 +196,13 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, IERC1271, Receiver
         view
         returns (bool)
     {
-        return WebAuthn.verify(
-            abi.encode(hash), // Challenge
-            false,
-            WebAuthn.tryDecodeAuth(signature), // Decode auth data from signature
-            x,
-            y
-        );
+        return WebAuthn.verify({
+            challenge: abi.encode(hash),
+            requireUserVerification: false,
+            auth: WebAuthn.tryDecodeAuth(signature),
+            x: x,
+            y: y
+        });
     }
 
     /**
@@ -199,6 +220,20 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, IERC1271, Receiver
         if (msg.sender != address(entryPoint())) {
             _checkOwner();
         }
+    }
+
+    /**
+     * @dev for EIP712
+     */
+    function _domainNameAndVersion()
+        internal
+        view
+        virtual
+        override
+        returns (string memory name, string memory version)
+    {
+        name = "JustanAccount";
+        version = "1";
     }
 
 }
