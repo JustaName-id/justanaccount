@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
+import { ERC1271 } from "@solady/accounts/ERC1271.sol";
 import { Receiver } from "@solady/accounts/Receiver.sol";
 import { ECDSA } from "@solady/utils/ECDSA.sol";
-import { EIP712 } from "@solady/utils/EIP712.sol";
 import { LibBit } from "@solady/utils/LibBit.sol";
 import { WebAuthn } from "@solady/utils/WebAuthn.sol";
 
@@ -24,7 +24,7 @@ import { MultiOwnable } from "./MultiOwnable.sol";
  * @title JustanAccount
  * @notice This contract is to be used via EIP-7702 delegation and supports ERC-4337
  */
-contract JustanAccount is BaseAccount, MultiOwnable, IERC165, IERC1271, Receiver, EIP712 {
+contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 {
 
     error JustanAccount_AlreadyInitialized();
 
@@ -63,18 +63,21 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, IERC1271, Receiver
     }
 
     /**
-     * @notice Validates the signature of the account.
+     * @notice Validates the signature of the account using ERC-7739 compliant nested EIP-712.
      * @param hash The hash of the signed message.
      * @param signature The signature of the message.
      * @return result The result of the signature validation.
      */
-    function isValidSignature(bytes32 hash, bytes calldata signature) external view returns (bytes4 result) {
-        bool success = _checkSignature({ hash: replaySafeHash(hash), signature: signature });
-        assembly {
-            // `success ? bytes4(keccak256("isValidSignature(bytes32,bytes)")) : 0xffffffff`.
-            // We use `0xffffffff` for invalid, in convention with the reference implementation.
-            result := shl(224, or(0x1626ba7e, sub(0, iszero(success))))
-        }
+    function isValidSignature(
+        bytes32 hash,
+        bytes calldata signature
+    )
+        public
+        view
+        override (ERC1271)
+        returns (bytes4 result)
+    {
+        return super.isValidSignature(hash, signature);
     }
 
     /**
@@ -103,21 +106,6 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, IERC1271, Receiver
     }
 
     /**
-     * @notice Produces a replay-safe hash from the given `hash`.
-     * @dev The returned EIP-712 compliant replay-safe hash is the result of:
-     *      keccak256(
-     *         \x19\x01 ||
-     *         this.domainSeparator ||
-     *         hashStruct(JustanAccount({ hash: `hash`}))
-     *      )
-     * @param hash The original hash.
-     * @return The corresponding replay-safe hash.
-     */
-    function replaySafeHash(bytes32 hash) public view virtual returns (bytes32) {
-        return _hashTypedData(hash);
-    }
-
-    /**
      * @notice Validates the signature of the account.
      * @dev Called by the entry point.
      * @param userOp The user operation.
@@ -134,6 +122,23 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, IERC1271, Receiver
         returns (uint256 validationData)
     {
         return _checkSignature(userOpHash, userOp.signature) ? SIG_VALIDATION_SUCCESS : SIG_VALIDATION_FAILED;
+    }
+
+    /**
+     * @dev Validates the signature using custom logic for ECDSA and WebAuthn.
+     * This overrides the default ECDSA-only validation to support multiple signature types.
+     */
+    function _erc1271IsValidSignatureNowCalldata(
+        bytes32 hash,
+        bytes calldata signature
+    )
+        internal
+        view
+        virtual
+        override
+        returns (bool)
+    {
+        return _checkSignature(hash, signature);
     }
 
     /**
@@ -220,6 +225,14 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, IERC1271, Receiver
         if (msg.sender != address(entryPoint())) {
             _checkOwner();
         }
+    }
+
+    /**
+     * @dev Required override from ERC1271 base contract.
+     * Not used - we override _erc1271IsValidSignatureNowCalldata to handle multiple owners.
+     */
+    function _erc1271Signer() internal view virtual override returns (address) {
+        return address(0);
     }
 
     /**
