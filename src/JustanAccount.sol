@@ -5,6 +5,8 @@ import { ERC1271 } from "@solady/accounts/ERC1271.sol";
 import { Receiver } from "@solady/accounts/Receiver.sol";
 import { ECDSA } from "@solady/utils/ECDSA.sol";
 import { LibBit } from "@solady/utils/LibBit.sol";
+
+import { SignatureCheckerLib } from "@solady/utils/SignatureCheckerLib.sol";
 import { WebAuthn } from "@solady/utils/WebAuthn.sol";
 
 import { BaseAccount } from "@account-abstraction/core/BaseAccount.sol";
@@ -121,12 +123,15 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
         override
         returns (uint256 validationData)
     {
-        return _checkSignature(userOpHash, userOp.signature) ? SIG_VALIDATION_SUCCESS : SIG_VALIDATION_FAILED;
+        return _erc1271IsValidSignatureNowCalldata(userOpHash, userOp.signature)
+            ? SIG_VALIDATION_SUCCESS
+            : SIG_VALIDATION_FAILED;
     }
 
     /**
      * @dev Validates the signature using custom logic for ECDSA and WebAuthn.
      * This overrides the default ECDSA-only validation to support multiple signature types.
+     * Only handles wrapped signatures - unwrapped signatures use SignatureCheckerLib directly.
      */
     function _erc1271IsValidSignatureNowCalldata(
         bytes32 hash,
@@ -138,39 +143,44 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
         override
         returns (bool)
     {
-        return _checkSignature(hash, signature);
-    }
-
-    /**
-     * @notice Validates signature.
-     * @dev Checks whether the recovered address is equal to the account address or is an owner of this account.
-     */
-    function _checkSignature(bytes32 hash, bytes calldata signature) internal view returns (bool) {
-        SignatureWrapper memory sigWrapper = abi.decode(signature, (SignatureWrapper));
-
-        if (LibBit.or(sigWrapper.signatureData.length == 64, sigWrapper.signatureData.length == 65)) {
-            address recovered = ECDSA.tryRecover(hash, sigWrapper.signatureData);
-            return (recovered != address(0) && (recovered == address(this) || isOwnerAddress(recovered)));
+        // Signature will not be wrapped if used via EIP-7702 delegation
+        if (signature.length == 64 || signature.length == 65) {
+            address recovered = ECDSA.tryRecover(hash, signature);
+            return (recovered != address(0) && (recovered == _erc1271Signer()));
         }
 
-        return _checkWebAuthnSignature(hash, signature);
+        // Otherwise, treat as wrapped signature for owners logic
+        SignatureWrapper memory sigWrapper = abi.decode(signature, (SignatureWrapper));
+        if (LibBit.or(sigWrapper.signatureData.length == 64, sigWrapper.signatureData.length == 65)) {
+            address recovered = ECDSA.tryRecover(hash, sigWrapper.signatureData);
+            return (recovered != address(0) && isOwnerAddress(recovered));
+        }
+
+        return _checkWebAuthnSignature(hash, sigWrapper.signatureData, sigWrapper.ownerIndex);
     }
 
     /**
-     * @notice Validates WebAuthn signature against all registered WebAuthn public keys.
+     * @notice Checks if a WebAuthn signature is valid for a given owner index.
      * @param hash The hash to verify.
-     * @param signature The WebAuthn signature data.
-     * @return True if signature is valid for any registered WebAuthn key.
+     * @param signatureData The WebAuthn signature data.
+     * @param ownerIndex The index of the owner to verify against.
+     * @return True if the signature is valid for the given owner index.
      */
-    function _checkWebAuthnSignature(bytes32 hash, bytes calldata signature) internal view returns (bool) {
-        SignatureWrapper memory sigWrapper = abi.decode(signature, (SignatureWrapper));
-
+    function _checkWebAuthnSignature(
+        bytes32 hash,
+        bytes memory signatureData,
+        uint256 ownerIndex
+    )
+        internal
+        view
+        returns (bool)
+    {
         // Check if owner index is valid
-        if (sigWrapper.ownerIndex >= nextOwnerIndex()) {
+        if (ownerIndex >= nextOwnerIndex()) {
             return false;
         }
 
-        bytes memory ownerBytes = ownerAtIndex(sigWrapper.ownerIndex);
+        bytes memory ownerBytes = ownerAtIndex(ownerIndex);
 
         // Check if it's a valid WebAuthn key (64 bytes) and is still an owner
         if (ownerBytes.length != 64 || !isOwnerBytes(ownerBytes)) {
@@ -180,7 +190,7 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
         // Decode public key coordinates
         (bytes32 x, bytes32 y) = abi.decode(ownerBytes, (bytes32, bytes32));
 
-        return _verifyWebAuthnSignature(hash, sigWrapper.signatureData, x, y);
+        return _verifyWebAuthnSignature(hash, signatureData, x, y);
     }
 
     /**
@@ -229,10 +239,10 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
 
     /**
      * @dev Required override from ERC1271 base contract.
-     * Not used - we override _erc1271IsValidSignatureNowCalldata to handle multiple owners.
+     * For EIP-7702 delegation, the signer is this contract address.
      */
     function _erc1271Signer() internal view virtual override returns (address) {
-        return address(0);
+        return address(this);
     }
 
     /**
