@@ -34,10 +34,10 @@ jobs:
 
       - name: Run Forge build
         run: |
-          forge build --sizes
+          FOUNDRY_PROFILE=solx forge build --sizes
         id: build
 
       - name: Run Forge tests
         run: |
-          forge test -vvv
+          FOUNDRY_PROFILE=solx forge test -vvv
         id: test
