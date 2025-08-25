@@ -16,7 +16,7 @@ contract TestMultiOwnableContractSelf is Test, CodeConstants {
 
     function setUp() public {
         DeployJustanAccount deployer = new DeployJustanAccount();
-        (justanAccount, networkConfig) = deployer.run();
+        (justanAccount,, networkConfig) = deployer.run();
 
         vm.signAndAttachDelegation(address(justanAccount), TEST_ACCOUNT_PRIVATE_KEY);
     }
@@ -29,6 +29,14 @@ contract TestMultiOwnableContractSelf is Test, CodeConstants {
         JustanAccount(TEST_ACCOUNT_ADDRESS).addOwnerAddress(owner);
 
         assertTrue(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerAddress(owner));
+        assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).ownerCount(), 1);
+    }
+
+    function test_ShouldAllowContractSelfToAddOwnerPublicKey(bytes32 x, bytes32 y) public {
+        vm.prank(TEST_ACCOUNT_ADDRESS);
+        JustanAccount(TEST_ACCOUNT_ADDRESS).addOwnerPublicKey(x, y);
+
+        assertTrue(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerPublicKey(x, y));
         assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).ownerCount(), 1);
     }
 
@@ -63,7 +71,7 @@ contract TestMultiOwnableContractSelf is Test, CodeConstants {
         assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).removedOwnersCount(), 1);
     }
 
-    function test_ShouldAllowBothContractSelfAndOwnerAccess(address owner) public {
+    function test_ShouldAllowBothContractSelfAndOwnerAccess(address owner, bytes32 x, bytes32 y) public {
         vm.assume(owner != TEST_ACCOUNT_ADDRESS);
         vm.assume(owner != address(0));
 
@@ -71,14 +79,14 @@ contract TestMultiOwnableContractSelf is Test, CodeConstants {
         JustanAccount(TEST_ACCOUNT_ADDRESS).addOwnerAddress(owner);
 
         vm.prank(owner);
-        JustanAccount(TEST_ACCOUNT_ADDRESS).addOwnerAddress(makeAddr("newOwner"));
+        JustanAccount(TEST_ACCOUNT_ADDRESS).addOwnerPublicKey(x, y);
 
         vm.prank(TEST_ACCOUNT_ADDRESS);
-        JustanAccount(TEST_ACCOUNT_ADDRESS).removeOwnerAtIndex(1, abi.encode(makeAddr("newOwner")));
+        JustanAccount(TEST_ACCOUNT_ADDRESS).removeOwnerAtIndex(1, abi.encode(x, y));
 
         assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).ownerCount(), 1);
         assertTrue(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerAddress(owner));
-        assertFalse(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerAddress(makeAddr("newOwner")));
+        assertFalse(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerPublicKey(x, y));
     }
 
 }

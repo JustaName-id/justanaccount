@@ -12,6 +12,20 @@ remappings = [
 optimizer = true
 optimizer_runs = 20000
 
+[profile.solx]
+src = "src"
+out = "out"
+evm_version = "prague"
+libs = ["lib"]
+remappings = [
+  '@account-abstraction/=lib/account-abstraction/contracts/',
+  '@solady/=lib/solady/src/',
+  '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/',
+]
+
+optimizer = true
+optimizer_runs = 20000
+
 [fuzz]
 runs = 256
 

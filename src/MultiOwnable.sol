@@ -74,6 +74,18 @@ contract MultiOwnable {
     error MultiOwnable_NotLastOwner(uint256 ownersRemaining);
 
     /**
+     * @notice Thrown when a provided owner is neither 64 bytes long (for public key) nor a ABI encoded address.
+     *  @param owner The invalid owner.
+     */
+    error MultiOwnable_InvalidOwnerBytesLength(bytes owner);
+
+    /**
+     * @notice Thrown when a provided owner is 32 bytes long but does not fit in an `address` type.
+     * @param owner The invalid owner.
+     */
+    error MultiOwnable_InvalidEthereumAddressOwner(bytes owner);
+
+    /**
      * @dev Slot for the `MultiOwnableStorage` struct in storage.
      * Computed from
      * keccak256(abi.encode(uint256(keccak256("justanaccount.storage.MultiOwnable")) - 1)) & ~bytes32(uint256(0xff))
@@ -116,6 +128,15 @@ contract MultiOwnable {
      */
     function addOwnerAddress(address owner) external virtual onlyOwnerOrEntryPoint {
         _addOwnerAtIndex(abi.encode(owner), _getMultiOwnableStorage().s_nextOwnerIndex++);
+    }
+
+    /**
+     * @notice Adds a new public-key owner.
+     * @param x The owner public key x coordinate.
+     * @param y The owner public key y coordinate.
+     */
+    function addOwnerPublicKey(bytes32 x, bytes32 y) external virtual onlyOwnerOrEntryPoint {
+        _addOwnerAtIndex(abi.encode(x, y), _getMultiOwnableStorage().s_nextOwnerIndex++);
     }
 
     /**
@@ -165,6 +186,16 @@ contract MultiOwnable {
     }
 
     /**
+     * @notice Checks if the given `x`, `y` public key is registered as owner.
+     * @param x The public key x coordinate.
+     * @param y The public key y coordinate.
+     * @return `true` if the public key is an owner else `false`.
+     */
+    function isOwnerPublicKey(bytes32 x, bytes32 y) public view virtual returns (bool) {
+        return _getMultiOwnableStorage().s_isOwner[abi.encode(x, y)];
+    }
+
+    /**
      * @notice Checks if the given `account` bytes is registered as owner.
      * @param account The account, should be ABI encoded address or public key.
      * @return `true` if the account is an owner else `false`.
@@ -206,6 +237,29 @@ contract MultiOwnable {
      */
     function removedOwnersCount() public view virtual returns (uint256) {
         return _getMultiOwnableStorage().s_removedOwnersCount;
+    }
+
+    /**
+     * @notice Initialize the owners of this contract.
+     * @dev Intended to be called when the contract is first deployed and never again.
+     * @dev Reverts if a provided owner is neither 64 bytes long (for public key) nor a valid address.
+     * @param owners The initial set of owners.
+     */
+    function _initializeOwners(bytes[] memory owners) internal virtual {
+        MultiOwnableStorage storage $ = _getMultiOwnableStorage();
+        uint256 nextOwnerIndex_ = $.s_nextOwnerIndex;
+        for (uint256 i; i < owners.length; i++) {
+            if (owners[i].length != 32 && owners[i].length != 64) {
+                revert MultiOwnable_InvalidOwnerBytesLength(owners[i]);
+            }
+
+            if (owners[i].length == 32 && uint256(bytes32(owners[i])) > type(uint160).max) {
+                revert MultiOwnable_InvalidEthereumAddressOwner(owners[i]);
+            }
+
+            _addOwnerAtIndex(owners[i], nextOwnerIndex_++);
+        }
+        $.s_nextOwnerIndex = nextOwnerIndex_;
     }
 
     /**

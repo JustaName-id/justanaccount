@@ -59,4 +59,3 @@ deploy-op-sepolia:
 
 deploy-arb-sepolia:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
-
