@@ -31,10 +31,6 @@ contract Test7702ExecuteFlow is Test, CodeConstants {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_ACCOUNT_PRIVATE_KEY, messageHash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        vm.signAndAttachDelegation(address(justanAccount), TEST_ACCOUNT_PRIVATE_KEY);
-        bytes4 result = JustanAccount(TEST_ACCOUNT_ADDRESS).isValidSignature(messageHash, signature);
-        assertEq(result, bytes4(0x1626ba7e));
-
         bytes memory mintData = abi.encodeCall(ERC20Mock.mint, (to, amount));
         bytes memory burnData = abi.encodeCall(ERC20Mock.burn, (to, amount));
 

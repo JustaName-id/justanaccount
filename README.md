@@ -1,5 +1,19 @@
 # JustanAccount
 
+⚠️ **CAUTION: These contracts are not yet audited. Use with caution.**
+
+## Temporary Deployment Addresses
+
+- **JustanAccountFactory**: `0xCe614E672bEA7186107448d882fA569F4A900F54`
+- **JustanAccount**: `0x369071946D889d0eAD1263eEd31809410f25D4Ca`
+
+**Deployed on:**
+
+- Ethereum Mainnet + Sepolia
+- Base Mainnet + Sepolia
+- Optimism Mainnet + Sepolia
+- Arbitrum One + Sepolia
+
 ## Overview
 
 The `JustanAccount` is a Solidity smart contract designed to enhance Ethereum account functionalities by integrating support for EIP-7702 and EIP-4337. These integrations enable features such as transaction batching, gas fee sponsorship, and advanced signature validation...

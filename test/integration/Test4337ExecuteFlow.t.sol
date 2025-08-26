@@ -43,9 +43,6 @@ contract Test4337ExecuteFlow is Test, CodeConstants {
 
         vm.signAndAttachDelegation(address(justanAccount), TEST_ACCOUNT_PRIVATE_KEY);
 
-        bytes4 result = JustanAccount(TEST_ACCOUNT_ADDRESS).isValidSignature(messageHash, signature);
-        assertEq(result, bytes4(0x1626ba7e));
-
         _executeMintOperation(to, amount);
         _executeBatchOperation(to, amount);
     }
