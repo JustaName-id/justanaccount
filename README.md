@@ -4,8 +4,8 @@
 
 ## Temporary Deployment Addresses
 
-- **JustanAccountFactory**: `0xCe614E672bEA7186107448d882fA569F4A900F54`
-- **JustanAccount**: `0x369071946D889d0eAD1263eEd31809410f25D4Ca`
+- **JustanAccountFactory**: `0x1578f4A87243bA8413ee8F5acf2af29635ED09EC`
+- **JustanAccount**: `0x2F107ca67d8D32eD8decEB5189b12093ce3E602F`
 
 **Deployed on:**
 
