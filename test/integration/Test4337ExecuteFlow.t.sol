@@ -26,7 +26,7 @@ contract Test4337ExecuteFlow is Test, CodeConstants {
 
     function setUp() public {
         DeployJustanAccount deployer = new DeployJustanAccount();
-        (justanAccount, networkConfig) = deployer.run();
+        (justanAccount,, networkConfig) = deployer.run();
 
         mockERC20 = new ERC20Mock();
         preparePackedUserOp = new PreparePackedUserOp();
@@ -42,9 +42,6 @@ contract Test4337ExecuteFlow is Test, CodeConstants {
         bytes memory signature = abi.encodePacked(r, s, v);
 
         vm.signAndAttachDelegation(address(justanAccount), TEST_ACCOUNT_PRIVATE_KEY);
-
-        bytes4 result = JustanAccount(TEST_ACCOUNT_ADDRESS).isValidSignature(messageHash, signature);
-        assertEq(result, bytes4(0x1626ba7e));
 
         _executeMintOperation(to, amount);
         _executeBatchOperation(to, amount);

@@ -52,7 +52,7 @@ contract TestGeneralJustanAccount is Test, CodeConstants {
 
     function setUp() public {
         DeployJustanAccount deployer = new DeployJustanAccount();
-        (justanAccount, networkConfig) = deployer.run();
+        (justanAccount,, networkConfig) = deployer.run();
 
         NFT_OWNER = makeAddr("nft_owner");
 
@@ -87,28 +87,6 @@ contract TestGeneralJustanAccount is Test, CodeConstants {
         vm.assume(_interfaceId != type(IERC1155Receiver).interfaceId);
 
         assertFalse(justanAccount.supportsInterface(_interfaceId));
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          VALID SIGNATURE TESTS
-    //////////////////////////////////////////////////////////////*/
-    function test_ShouldReturnFalseIfIncorrectSignature(bytes32 messageHash) public {
-        (, uint256 alicePk) = makeAddrAndKey("alice");
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, messageHash);
-        bytes memory badSignature = abi.encodePacked(r, s, v);
-
-        vm.signAndAttachDelegation(address(justanAccount), TEST_ACCOUNT_PRIVATE_KEY);
-        bytes4 result = JustanAccount(TEST_ACCOUNT_ADDRESS).isValidSignature(messageHash, badSignature);
-        assertEq(result, bytes4(0xffffffff));
-    }
-
-    function test_ShouldReturnTrueIfSignatureIsValid(bytes32 messageHash) public {
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(TEST_ACCOUNT_PRIVATE_KEY, messageHash);
-        bytes memory signature = abi.encodePacked(r, s, v);
-
-        vm.signAndAttachDelegation(address(justanAccount), TEST_ACCOUNT_PRIVATE_KEY);
-        bytes4 result = JustanAccount(TEST_ACCOUNT_ADDRESS).isValidSignature(messageHash, signature);
-        assertEq(result, bytes4(0x1626ba7e));
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -25,13 +25,23 @@ contract TestMultiOwnableFlow is Test, CodeConstants {
 
     function setUp() public {
         DeployJustanAccount deployer = new DeployJustanAccount();
-        (justanAccount, networkConfig) = deployer.run();
+        (justanAccount,, networkConfig) = deployer.run();
         preparePackedUserOp = new PreparePackedUserOp();
 
         vm.signAndAttachDelegation(address(justanAccount), TEST_ACCOUNT_PRIVATE_KEY);
     }
 
-    function test_ShouldChangeOwnershipCorrectlyWith7702(address owner1, address owner2, address owner3) public {
+    function test_ShouldChangeOwnershipCorrectlyWith7702(
+        address owner1,
+        address owner2,
+        address owner3,
+        bytes32 pubKeyX,
+        bytes32 pubKeyY,
+        bytes32 pubKeyX2,
+        bytes32 pubKeyY2
+    )
+        public
+    {
         vm.assume(owner1 != address(0));
         vm.assume(owner2 != address(0));
         vm.assume(owner3 != address(0));
@@ -51,30 +61,54 @@ contract TestMultiOwnableFlow is Test, CodeConstants {
         assertTrue(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerAddress(owner1));
 
         vm.prank(owner1);
-        JustanAccount(TEST_ACCOUNT_ADDRESS).addOwnerAddress(owner2);
+        JustanAccount(TEST_ACCOUNT_ADDRESS).addOwnerPublicKey(pubKeyX, pubKeyY);
 
         assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).ownerCount(), 2);
+        assertTrue(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerPublicKey(pubKeyX, pubKeyY));
+
+        vm.prank(owner1);
+        JustanAccount(TEST_ACCOUNT_ADDRESS).addOwnerAddress(owner2);
+
+        assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).ownerCount(), 3);
         assertTrue(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerAddress(owner2));
+
+        vm.prank(owner2);
+        JustanAccount(TEST_ACCOUNT_ADDRESS).addOwnerPublicKey(pubKeyX2, pubKeyY2);
+
+        assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).ownerCount(), 4);
+        assertTrue(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerPublicKey(pubKeyX2, pubKeyY2));
 
         vm.prank(owner2);
         JustanAccount(TEST_ACCOUNT_ADDRESS).addOwnerAddress(owner3);
 
-        assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).ownerCount(), 3);
+        assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).ownerCount(), 5);
         assertTrue(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerAddress(owner3));
 
         vm.prank(owner3);
-        JustanAccount(TEST_ACCOUNT_ADDRESS).removeOwnerAtIndex(2, abi.encode(owner3));
+        JustanAccount(TEST_ACCOUNT_ADDRESS).removeOwnerAtIndex(4, abi.encode(owner3));
 
-        assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).ownerCount(), 2);
+        assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).ownerCount(), 4);
         assertFalse(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerAddress(owner3));
         assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).removedOwnersCount(), 1);
 
         vm.prank(owner1);
-        JustanAccount(TEST_ACCOUNT_ADDRESS).removeOwnerAtIndex(1, abi.encode(owner2));
+        JustanAccount(TEST_ACCOUNT_ADDRESS).removeOwnerAtIndex(3, abi.encode(pubKeyX2, pubKeyY2));
+
+        assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).ownerCount(), 3);
+        assertFalse(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerPublicKey(pubKeyX2, pubKeyY2));
+        assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).removedOwnersCount(), 2);
+
+        vm.prank(TEST_ACCOUNT_ADDRESS);
+        JustanAccount(TEST_ACCOUNT_ADDRESS).removeOwnerAtIndex(2, abi.encode(owner2));
+
+        assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).ownerCount(), 2);
+        assertFalse(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerAddress(owner2));
+
+        vm.prank(owner1);
+        JustanAccount(TEST_ACCOUNT_ADDRESS).removeOwnerAtIndex(1, abi.encode(pubKeyX, pubKeyY));
 
         assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).ownerCount(), 1);
-        assertFalse(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerAddress(owner2));
-        assertEq(JustanAccount(TEST_ACCOUNT_ADDRESS).removedOwnersCount(), 2);
+        assertFalse(JustanAccount(TEST_ACCOUNT_ADDRESS).isOwnerPublicKey(pubKeyX, pubKeyY));
 
         vm.prank(TEST_ACCOUNT_ADDRESS);
         JustanAccount(TEST_ACCOUNT_ADDRESS).removeLastOwner(0, abi.encode(owner1));
