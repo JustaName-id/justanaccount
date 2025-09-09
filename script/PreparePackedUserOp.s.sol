@@ -14,6 +14,44 @@ contract PreparePackedUserOp is Script, CodeConstants {
 
     using MessageHashUtils for bytes32;
 
+    /**
+     * @notice Generates a signed UserOperation with custom sender and signer
+     * @param callData The calldata for the UserOperation
+     * @param sender The address of the account that will execute the operation
+     * @param signerPrivateKey The private key to sign the operation with
+     * @param entryPoint The EntryPoint contract address
+     * @param isEIP7702 Whether this is for EIP-7702 delegation (true) or factory accounts (false)
+     * @return userOp The signed UserOperation
+     * @return userOpHash The hash of the UserOperation
+     */
+    function generateSignedUserOperation(
+        bytes memory callData,
+        address sender,
+        uint256 signerPrivateKey,
+        address entryPoint,
+        bool isEIP7702
+    )
+        public
+        view
+        returns (PackedUserOperation memory userOp, bytes32 userOpHash)
+    {
+        uint256 nonce = IEntryPoint(entryPoint).getNonce(sender, 0);
+        userOp = _generateUnsignedUserOperation(callData, sender, nonce, isEIP7702);
+        userOpHash = IEntryPoint(entryPoint).getUserOpHash(userOp);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, userOpHash);
+        userOp.signature = abi.encodePacked(r, s, v);
+
+        return (userOp, userOpHash);
+    }
+
+    /**
+     * @notice Convenience method that generates a signed UserOperation using TEST_ACCOUNT defaults
+     * @param callData The calldata for the UserOperation
+     * @param entryPoint The EntryPoint contract address
+     * @return userOp The signed UserOperation
+     * @return userOpHash The hash of the UserOperation
+     */
     function generateSignedUserOperation(
         bytes memory callData,
         address entryPoint
@@ -22,24 +60,39 @@ contract PreparePackedUserOp is Script, CodeConstants {
         view
         returns (PackedUserOperation memory userOp, bytes32 userOpHash)
     {
-        uint256 nonce = IEntryPoint(entryPoint).getNonce(TEST_ACCOUNT_ADDRESS, 0);
-        userOp = _generateUnsignedUserOperation(callData, TEST_ACCOUNT_ADDRESS, nonce);
+        return generateSignedUserOperation(callData, TEST_ACCOUNT_ADDRESS, TEST_ACCOUNT_PRIVATE_KEY, entryPoint, true);
+    }
 
+    /**
+     * @notice Generates an unsigned UserOperation for manual signing
+     * @param callData The calldata for the UserOperation
+     * @param sender The address of the account that will execute the operation
+     * @param entryPoint The EntryPoint contract address
+     * @param isEIP7702 Whether this is for EIP-7702 delegation (true) or factory accounts (false)
+     * @return userOp The unsigned UserOperation
+     * @return userOpHash The hash of the UserOperation
+     */
+    function generateUnsignedUserOperation(
+        bytes memory callData,
+        address sender,
+        address entryPoint,
+        bool isEIP7702
+    )
+        public
+        view
+        returns (PackedUserOperation memory userOp, bytes32 userOpHash)
+    {
+        uint256 nonce = IEntryPoint(entryPoint).getNonce(sender, 0);
+        userOp = _generateUnsignedUserOperation(callData, sender, nonce, isEIP7702);
         userOpHash = IEntryPoint(entryPoint).getUserOpHash(userOp);
-
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-        (v, r, s) = vm.sign(TEST_ACCOUNT_PRIVATE_KEY, userOpHash);
-        userOp.signature = abi.encodePacked(r, s, v);
-
         return (userOp, userOpHash);
     }
 
     function _generateUnsignedUserOperation(
         bytes memory callData,
         address sender,
-        uint256 nonce
+        uint256 nonce,
+        bool isEIP7702
     )
         internal
         pure
@@ -50,10 +103,14 @@ contract PreparePackedUserOp is Script, CodeConstants {
         uint128 maxPriorityFeePerGas = 256;
         uint128 maxFeePerGas = maxPriorityFeePerGas;
 
+        // Use EIP-7702 marker for delegation, empty for factory accounts
+        bytes memory initCode =
+            isEIP7702 ? abi.encodePacked(bytes20(0x7702000000000000000000000000000000000000)) : bytes("");
+
         return PackedUserOperation({
             sender: sender,
             nonce: nonce,
-            initCode: abi.encodePacked(bytes20(0x7702000000000000000000000000000000000000)),
+            initCode: initCode,
             callData: callData,
             accountGasLimits: bytes32(uint256(verificationGasLimit) << 128 | callGasLimit),
             preVerificationGas: verificationGasLimit,
