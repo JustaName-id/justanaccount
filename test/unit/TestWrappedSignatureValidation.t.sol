@@ -47,6 +47,55 @@ contract TestWrappedSignatureValidation is Test, CodeConstants {
     }
 
     /*//////////////////////////////////////////////////////////////
+                    WRAPPED SIGNATURE CHECKS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_ShouldFailWrappedSignatureWithInvalidOwnerIndex(uint256 ownerIndex) public {
+        vm.assume(ownerIndex > account.nextOwnerIndex());
+
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = preparePackedUserOp.generateSignedUserOperation(
+            CALLDATA, initialOwner, initialOwnerPk, networkConfig.entryPointAddress, false
+        );
+
+        JustanAccount.SignatureWrapper memory sigWrapper =
+            JustanAccount.SignatureWrapper({ ownerIndex: ownerIndex, signatureData: userOp.signature });
+
+        userOp.signature = abi.encode(sigWrapper);
+
+        vm.prank(networkConfig.entryPointAddress);
+        uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
+
+        assertEq(validationData, SIG_VALIDATION_FAILED);
+    }
+
+    function test_ShouldFailWrappedSignatureWithRemovedOwner(uint256 newOwnerPk) public {
+        vm.assume(newOwnerPk > 0 && newOwnerPk < SECP256K1_CURVE_ORDER);
+        vm.assume(newOwnerPk != initialOwnerPk);
+
+        address newOwner = vm.addr(newOwnerPk);
+
+        vm.prank(initialOwner);
+        account.addOwnerAddress(newOwner);
+
+        vm.prank(initialOwner);
+        account.removeOwnerAtIndex(1, abi.encode(newOwner));
+
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = preparePackedUserOp.generateSignedUserOperation(
+            CALLDATA, newOwner, newOwnerPk, networkConfig.entryPointAddress, false
+        );
+
+        JustanAccount.SignatureWrapper memory sigWrapper =
+            JustanAccount.SignatureWrapper({ ownerIndex: 1, signatureData: userOp.signature });
+
+        userOp.signature = abi.encode(sigWrapper);
+
+        vm.prank(networkConfig.entryPointAddress);
+        uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
+
+        assertEq(validationData, SIG_VALIDATION_FAILED);
+    }
+
+    /*//////////////////////////////////////////////////////////////
                     WRAPPED SIGNATURE (SignatureWrapper) TESTS
     //////////////////////////////////////////////////////////////*/
 
@@ -122,4 +171,27 @@ contract TestWrappedSignatureValidation is Test, CodeConstants {
         assertEq(validationData, SIG_VALIDATION_FAILED);
     }
 
+    function test_ShouldFailWrappedSignatureWithWrongOwnerIndex(uint256 newOwnerPk) public {
+        vm.assume(newOwnerPk > 0 && newOwnerPk < SECP256K1_CURVE_ORDER);
+        vm.assume(newOwnerPk != initialOwnerPk);
+
+        address newOwner = vm.addr(newOwnerPk);
+        
+        vm.prank(initialOwner);
+        account.addOwnerAddress(newOwner);
+
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = preparePackedUserOp.generateSignedUserOperation(
+            CALLDATA, newOwner, newOwnerPk, networkConfig.entryPointAddress, false
+        );
+        
+        JustanAccount.SignatureWrapper memory sigWrapper =
+            JustanAccount.SignatureWrapper({ ownerIndex: 0, signatureData: userOp.signature });
+
+        userOp.signature = abi.encode(sigWrapper);
+
+        vm.prank(networkConfig.entryPointAddress);
+        uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
+
+        assertEq(validationData, SIG_VALIDATION_FAILED);
+    }
 }

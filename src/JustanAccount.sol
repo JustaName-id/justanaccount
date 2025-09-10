@@ -149,40 +149,52 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
             return (recovered != address(0) && (recovered == _erc1271Signer()));
         }
 
-        // Otherwise, treat as wrapped signature for owners logic
         SignatureWrapper memory sigWrapper = abi.decode(signature, (SignatureWrapper));
-        if (LibBit.or(sigWrapper.signatureData.length == 64, sigWrapper.signatureData.length == 65)) {
-            address recovered = ECDSA.tryRecover(hash, sigWrapper.signatureData);
-            return (recovered != address(0) && isOwnerAddress(recovered));
+
+        // Check if owner index is valid
+        if (sigWrapper.ownerIndex >= nextOwnerIndex()) {
+            return false;
         }
 
-        return _checkWebAuthnSignature(hash, sigWrapper.signatureData, sigWrapper.ownerIndex);
+        bytes memory ownerAtIndexBytes = ownerAtIndex(sigWrapper.ownerIndex);
+        
+        // Check if owner exists (empty bytes means owner was removed)
+        if (ownerAtIndexBytes.length == 0) {
+            return false;
+        }
+
+        // ECDSA validation for 32-byte address owners
+        if (ownerAtIndexBytes.length == 32 && LibBit.or(sigWrapper.signatureData.length == 64, sigWrapper.signatureData.length == 65)) {
+            address recovered = ECDSA.tryRecover(hash, sigWrapper.signatureData);
+            address expectedOwner = abi.decode(ownerAtIndexBytes, (address));
+            return recovered == expectedOwner;
+        }
+
+        // WebAuthn validation for 64-byte public key owners
+        if (ownerAtIndexBytes.length == 64) {
+            return _checkWebAuthnSignature(hash, sigWrapper.signatureData, ownerAtIndexBytes);
+        }
+
+        return false;
     }
 
     /**
-     * @notice Checks if a WebAuthn signature is valid for a given owner index.
+     * @notice Checks if a WebAuthn signature is valid for a given owner bytes.
      * @param hash The hash to verify.
      * @param signatureData The WebAuthn signature data.
-     * @param ownerIndex The index of the owner to verify against.
-     * @return True if the signature is valid for the given owner index.
+     * @param ownerBytes The owner bytes to verify against.
+     * @return True if the signature is valid for the given owner bytes.
      */
     function _checkWebAuthnSignature(
         bytes32 hash,
         bytes memory signatureData,
-        uint256 ownerIndex
+        bytes memory ownerBytes
     )
         internal
         view
         returns (bool)
     {
-        // Check if owner index is valid
-        if (ownerIndex >= nextOwnerIndex()) {
-            return false;
-        }
-
-        bytes memory ownerBytes = ownerAtIndex(ownerIndex);
-
-        // Check if it's a valid WebAuthn key (64 bytes) and is still an owner
+        // Check if it's a valid WebAuthn key (64 bytes) and is an owner
         if (ownerBytes.length != 64 || !isOwnerBytes(ownerBytes)) {
             return false;
         }
