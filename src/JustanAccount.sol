@@ -5,16 +5,19 @@ import { ERC1271 } from "@solady/accounts/ERC1271.sol";
 import { Receiver } from "@solady/accounts/Receiver.sol";
 import { ECDSA } from "@solady/utils/ECDSA.sol";
 import { LibBit } from "@solady/utils/LibBit.sol";
-
 import { SignatureCheckerLib } from "@solady/utils/SignatureCheckerLib.sol";
 import { WebAuthn } from "@solady/utils/WebAuthn.sol";
 
 import { BaseAccount } from "@account-abstraction/core/BaseAccount.sol";
 import { SIG_VALIDATION_FAILED, SIG_VALIDATION_SUCCESS } from "@account-abstraction/core/Helpers.sol";
+import { UserOperationLib } from "@account-abstraction/core/UserOperationLib.sol";
+import { Exec } from "@account-abstraction/utils/Exec.sol";
+import { Eip7702Support } from "@account-abstraction/core/Eip7702Support.sol";
 import { IAccount } from "@account-abstraction/interfaces/IAccount.sol";
 import { IEntryPoint } from "@account-abstraction/interfaces/IEntryPoint.sol";
 import { PackedUserOperation } from "@account-abstraction/interfaces/PackedUserOperation.sol";
 
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import { IERC1271 } from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import { IERC1155Receiver } from "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import { IERC721Receiver } from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
@@ -28,7 +31,30 @@ import { MultiOwnable } from "./MultiOwnable.sol";
  */
 contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 {
 
+    using UserOperationLib for PackedUserOperation;
+
+    /**
+     * @notice Thrown when attempting to initialize an already initialized account.
+     */
     error JustanAccount_AlreadyInitialized();
+
+    /**
+     * @notice Thrown when a call is passed to `executeWithoutChainIdValidation` that is not allowed by
+     *         `canSkipChainIdValidation`
+     *
+     * @param selector The selector of the call.
+     */
+    error JustanAccount_SelectorNotAllowed(bytes4 selector);
+
+    /**
+     * @notice Thrown in validateUserOp if the key of `UserOperation.nonce` does not match the calldata.
+     *
+     * @dev Calls to `this.executeWithoutChainIdValidation` MUST use `REPLAYABLE_NONCE_KEY` and
+     *      calls NOT to `this.executeWithoutChainIdValidation` MUST NOT use `REPLAYABLE_NONCE_KEY`.
+     *
+     * @param key The invalid `UserOperation.nonce` key.
+     */
+    error JustanAccount_InvalidNonceKey(uint256 key);
 
     struct SignatureWrapper {
         /// @dev The index of the owner that signed, see `MultiOwnable.ownerAtIndex`
@@ -45,6 +71,21 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
     IEntryPoint private immutable i_entryPoint;
 
     /**
+     * @notice Reserved nonce key (upper 192 bits of `UserOperation.nonce`) for cross-chain replayable
+     *         transactions.
+     *
+     * @dev MUST BE the `UserOperation.nonce` key when `UserOperation.calldata` is calling
+     *      `executeWithoutChainIdValidation`and MUST NOT BE `UserOperation.nonce` key when `UserOperation.calldata` is
+     *      NOT calling `executeWithoutChainIdValidation`.
+     *
+     * @dev Helps enforce sequential sequencing of replayable transactions.
+     */
+    uint256 public constant REPLAYABLE_NONCE_KEY = 9999;
+
+    bytes32 private constant TYPE_HASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+
+    /**
      * @notice Initializes the JustanAccount contract with the entry point address.
      * @param entryPointAddress The address of the entry point contract.
      */
@@ -58,10 +99,98 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
     }
 
     /**
+     * @notice Executes `calls` on this account (i.e. self call).
+     *
+     * @dev Reverts if the given call is not authorized to skip the chain ID validation.
+     * @dev `validateUserOp()` will recompute the `userOpHash` without the chain ID before validating
+     *      it if the `UserOperation.calldata` is calling this function. This allows certain UserOperations
+     *      to be replayed for all accounts sharing the same address across chains. E.g. This may be
+     *      useful for syncing owner changes.
+     *
+     * @param calls An array of calldata to use for separate self calls.
+     */
+    function executeWithoutChainIdValidation(bytes[] calldata calls) external payable virtual {
+        _requireForExecute();
+        uint256 callsLength = calls.length;
+        for (uint256 i; i < callsLength; i++) {
+            bytes calldata call = calls[i];
+            bytes4 selector = bytes4(call);
+            if (!canSkipChainIdValidation(selector)) {
+                revert JustanAccount_SelectorNotAllowed(selector);
+            }
+
+            bool ok = Exec.call(address(this), 0, call, gasleft());
+            if (!ok) {
+                Exec.revertWithReturnData();
+            }
+        }
+    }
+
+     /**
+     * @notice Validates UserOperation with cross-chain support.
+     * @dev Overrides BaseAccount to handle cross-chain replayable operations.
+     * @param userOp The user operation to validate.
+     * @param userOpHash The hash of the user operation from EntryPoint.
+     * @param missingAccountFunds The missing account funds.
+     * @return validationData The validation result.
+     */
+    function validateUserOp(
+        PackedUserOperation calldata userOp,
+        bytes32 userOpHash,
+        uint256 missingAccountFunds
+    )
+        external
+        virtual
+        override
+        returns (uint256 validationData)
+    {
+        _requireFromEntryPoint();
+
+        uint256 key = userOp.nonce >> 64;
+
+        // Check if this is a cross-chain replayable operation
+        if (bytes4(userOp.callData) == this.executeWithoutChainIdValidation.selector) {
+            
+
+            userOpHash = getUserOpHashWithoutChainId(userOp);
+
+            if (key != REPLAYABLE_NONCE_KEY) {
+                revert JustanAccount_InvalidNonceKey(key);
+            }
+        } else {
+            if (key == REPLAYABLE_NONCE_KEY) {
+                revert JustanAccount_InvalidNonceKey(key);
+            }
+        }
+
+        validationData = _validateSignature(userOp, userOpHash);
+        _validateNonce(userOp.nonce);
+        _payPrefund(missingAccountFunds);
+    }
+
+
+    /**
      * @notice Returns entrypoint used by this account
      */
     function entryPoint() public view virtual override returns (IEntryPoint) {
         return i_entryPoint;
+    }
+
+    /**
+     * @notice Computes the hash of a UserOperation in the same way as EntryPoint v0.8, but excludes the chain ID.
+     * @dev This enables cross-chain replay of UserOperations with the same signature for certain operations.
+     * @param userOp The user operation to hash.
+     * @return The hash of the UserOperation without chain ID.
+     */
+    function getUserOpHashWithoutChainId(PackedUserOperation calldata userOp)
+        public
+        view
+        virtual
+        returns (bytes32)
+    {
+        bytes32 overrideInitCodeHash = Eip7702Support._getEip7702InitCodeHashOverride(userOp);
+        return
+            MessageHashUtils.toTypedDataHash(keccak256(abi.encode(TYPE_HASH, "ERC4337", "1", 0, address(entryPoint()))), userOp.hash(overrideInitCodeHash));
     }
 
     /**
@@ -90,6 +219,24 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
     function supportsInterface(bytes4 id) public pure override (IERC165) returns (bool) {
         return id == type(IERC165).interfaceId || id == type(IAccount).interfaceId || id == type(IERC1271).interfaceId
             || id == type(IERC1155Receiver).interfaceId || id == type(IERC721Receiver).interfaceId;
+    }
+
+    /**
+     * @notice Returns whether `functionSelector` can be called in `executeWithoutChainIdValidation`.
+     *
+     * @param functionSelector The function selector to check.
+     * @return `true` is the function selector is allowed to skip the chain ID validation, else `false`.
+     */
+    function canSkipChainIdValidation(bytes4 functionSelector) public pure returns (bool) {
+        if (
+            functionSelector == MultiOwnable.addOwnerPublicKey.selector
+                || functionSelector == MultiOwnable.addOwnerAddress.selector
+                || functionSelector == MultiOwnable.removeOwnerAtIndex.selector
+                || functionSelector == MultiOwnable.removeLastOwner.selector
+        ) {
+            return true;
+        }
+        return false;
     }
 
     /**
