@@ -9,18 +9,19 @@ import { SignatureCheckerLib } from "@solady/utils/SignatureCheckerLib.sol";
 import { WebAuthn } from "@solady/utils/WebAuthn.sol";
 
 import { BaseAccount } from "@account-abstraction/core/BaseAccount.sol";
+
+import { Eip7702Support } from "@account-abstraction/core/Eip7702Support.sol";
 import { SIG_VALIDATION_FAILED, SIG_VALIDATION_SUCCESS } from "@account-abstraction/core/Helpers.sol";
 import { UserOperationLib } from "@account-abstraction/core/UserOperationLib.sol";
-import { Exec } from "@account-abstraction/utils/Exec.sol";
-import { Eip7702Support } from "@account-abstraction/core/Eip7702Support.sol";
 import { IAccount } from "@account-abstraction/interfaces/IAccount.sol";
 import { IEntryPoint } from "@account-abstraction/interfaces/IEntryPoint.sol";
 import { PackedUserOperation } from "@account-abstraction/interfaces/PackedUserOperation.sol";
+import { Exec } from "@account-abstraction/utils/Exec.sol";
 
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import { IERC1271 } from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import { IERC1155Receiver } from "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import { IERC721Receiver } from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import { MultiOwnable } from "./MultiOwnable.sol";
@@ -126,7 +127,7 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
         }
     }
 
-     /**
+    /**
      * @notice Validates UserOperation with cross-chain support.
      * @dev Overrides BaseAccount to handle cross-chain replayable operations.
      * @param userOp The user operation to validate.
@@ -150,8 +151,6 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
 
         // Check if this is a cross-chain replayable operation
         if (bytes4(userOp.callData) == this.executeWithoutChainIdValidation.selector) {
-            
-
             userOpHash = getUserOpHashWithoutChainId(userOp);
 
             if (key != REPLAYABLE_NONCE_KEY) {
@@ -168,7 +167,6 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
         _payPrefund(missingAccountFunds);
     }
 
-
     /**
      * @notice Returns entrypoint used by this account
      */
@@ -182,15 +180,12 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
      * @param userOp The user operation to hash.
      * @return The hash of the UserOperation without chain ID.
      */
-    function getUserOpHashWithoutChainId(PackedUserOperation calldata userOp)
-        public
-        view
-        virtual
-        returns (bytes32)
-    {
+    function getUserOpHashWithoutChainId(PackedUserOperation calldata userOp) public view virtual returns (bytes32) {
         bytes32 overrideInitCodeHash = Eip7702Support._getEip7702InitCodeHashOverride(userOp);
-        return
-            MessageHashUtils.toTypedDataHash(keccak256(abi.encode(TYPE_HASH, "ERC4337", "1", 0, address(entryPoint()))), userOp.hash(overrideInitCodeHash));
+        return MessageHashUtils.toTypedDataHash(
+            keccak256(abi.encode(TYPE_HASH, "ERC4337", "1", 0, address(entryPoint()))),
+            userOp.hash(overrideInitCodeHash)
+        );
     }
 
     /**
