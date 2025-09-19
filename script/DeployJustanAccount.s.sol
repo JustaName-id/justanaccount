@@ -21,23 +21,34 @@ contract DeployJustanAccount is Script {
         HelperConfig.NetworkConfig memory config = helperConfig.getConfig();
 
         console2.log("Deploying on chain ID", block.chainid);
-        address implementation = SafeSingletonDeployer.broadcastDeploy({
-            creationCode: type(JustanAccount).creationCode,
-            args: abi.encode(config.entryPointAddress),
-            salt: IMPLEMENTATION_SALT
-        });
 
-        console2.log("implementation", implementation);
-        assert(implementation == EXPECTED_IMPLEMENTATION);
+        address implementation;
+        address factory;
 
-        address factory = SafeSingletonDeployer.broadcastDeploy({
-            creationCode: type(JustanAccountFactory).creationCode,
-            args: abi.encode(implementation),
-            salt: FACTORY_SALT
-        });
+        if (block.chainid == 31_337) {
+            vm.startBroadcast();
+            implementation = address(new JustanAccount(config.entryPointAddress));
+            factory = address(new JustanAccountFactory(implementation));
+            vm.stopBroadcast();
+        } else {
+            implementation = SafeSingletonDeployer.broadcastDeploy({
+                creationCode: type(JustanAccount).creationCode,
+                args: abi.encode(config.entryPointAddress),
+                salt: IMPLEMENTATION_SALT
+            });
 
-        console2.log("factory", factory);
-        assert(factory == EXPECTED_FACTORY);
+            console2.log("implementation", implementation);
+            assert(implementation == EXPECTED_IMPLEMENTATION);
+
+            factory = SafeSingletonDeployer.broadcastDeploy({
+                creationCode: type(JustanAccountFactory).creationCode,
+                args: abi.encode(implementation),
+                salt: FACTORY_SALT
+            });
+
+            console2.log("factory", factory);
+            assert(factory == EXPECTED_FACTORY);
+        }
 
         return (JustanAccount(payable(implementation)), JustanAccountFactory(factory), config);
     }
