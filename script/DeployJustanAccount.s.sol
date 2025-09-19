@@ -5,20 +5,52 @@ pragma solidity ^0.8.4;
 import { JustanAccount } from "../src/JustanAccount.sol";
 import { JustanAccountFactory } from "../src/JustanAccountFactory.sol";
 import { HelperConfig } from "./HelperConfig.s.sol";
-import { Script } from "forge-std/Script.sol";
+import { Script, console2 } from "forge-std/Script.sol";
+import { SafeSingletonDeployer } from "safe-singleton-deployer-sol/src/SafeSingletonDeployer.sol";
 
 contract DeployJustanAccount is Script {
+
+    address constant EXPECTED_IMPLEMENTATION = 0x624412D1c7253A0431f2F13B473d8B658C8c13Dc;
+    address constant EXPECTED_FACTORY = 0x363C479DBAF9C2EE8db5BFd0d71768C3572a3572;
+
+    bytes32 constant IMPLEMENTATION_SALT = 0x0000000000000000000000000000000000000000000000000000000000000000;
+    bytes32 constant FACTORY_SALT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 
     function run() external returns (JustanAccount, JustanAccountFactory, HelperConfig.NetworkConfig memory) {
         HelperConfig helperConfig = new HelperConfig();
         HelperConfig.NetworkConfig memory config = helperConfig.getConfig();
 
-        vm.startBroadcast();
-        JustanAccount account = new JustanAccount{ salt: 0 }(config.entryPointAddress);
-        JustanAccountFactory factory = new JustanAccountFactory{ salt: 0 }(address(account));
-        vm.stopBroadcast();
+        console2.log("Deploying on chain ID", block.chainid);
 
-        return (account, factory, config);
+        address implementation;
+        address factory;
+
+        if (block.chainid == 31_337) {
+            vm.startBroadcast();
+            implementation = address(new JustanAccount(config.entryPointAddress));
+            factory = address(new JustanAccountFactory(implementation));
+            vm.stopBroadcast();
+        } else {
+            implementation = SafeSingletonDeployer.broadcastDeploy({
+                creationCode: type(JustanAccount).creationCode,
+                args: abi.encode(config.entryPointAddress),
+                salt: IMPLEMENTATION_SALT
+            });
+
+            console2.log("implementation", implementation);
+            assert(implementation == EXPECTED_IMPLEMENTATION);
+
+            factory = SafeSingletonDeployer.broadcastDeploy({
+                creationCode: type(JustanAccountFactory).creationCode,
+                args: abi.encode(implementation),
+                salt: FACTORY_SALT
+            });
+
+            console2.log("factory", factory);
+            assert(factory == EXPECTED_FACTORY);
+        }
+
+        return (JustanAccount(payable(implementation)), JustanAccountFactory(factory), config);
     }
 
 }
