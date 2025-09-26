@@ -41,7 +41,6 @@ abstract contract CodeConstants {
 
     uint256 public constant SECP256K1_CURVE_ORDER =
         115_792_089_237_316_195_423_570_985_008_687_907_852_837_564_279_074_904_382_605_163_141_518_161_494_337;
-
 }
 
 contract HelperConfig is CodeConstants, Script {

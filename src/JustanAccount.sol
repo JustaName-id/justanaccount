@@ -149,52 +149,40 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
             return (recovered != address(0) && (recovered == _erc1271Signer()));
         }
 
+        // Otherwise, treat as wrapped signature for owners logic
         SignatureWrapper memory sigWrapper = abi.decode(signature, (SignatureWrapper));
-
-        // Check if owner index is valid
-        if (sigWrapper.ownerIndex >= nextOwnerIndex()) {
-            return false;
-        }
-
-        bytes memory ownerAtIndexBytes = ownerAtIndex(sigWrapper.ownerIndex);
-        
-        // Check if owner exists (empty bytes means owner was removed)
-        if (ownerAtIndexBytes.length == 0) {
-            return false;
-        }
-
-        // ECDSA validation for 32-byte address owners
-        if (ownerAtIndexBytes.length == 32 && LibBit.or(sigWrapper.signatureData.length == 64, sigWrapper.signatureData.length == 65)) {
+        if (LibBit.or(sigWrapper.signatureData.length == 64, sigWrapper.signatureData.length == 65)) {
             address recovered = ECDSA.tryRecover(hash, sigWrapper.signatureData);
-            address expectedOwner = abi.decode(ownerAtIndexBytes, (address));
-            return recovered == expectedOwner;
+            return (recovered != address(0) && isOwnerAddress(recovered));
         }
 
-        // WebAuthn validation for 64-byte public key owners
-        if (ownerAtIndexBytes.length == 64) {
-            return _checkWebAuthnSignature(hash, sigWrapper.signatureData, ownerAtIndexBytes);
-        }
-
-        return false;
+        return _checkWebAuthnSignature(hash, sigWrapper.signatureData, sigWrapper.ownerIndex);
     }
 
     /**
-     * @notice Checks if a WebAuthn signature is valid for a given owner bytes.
+     * @notice Checks if a WebAuthn signature is valid for a given owner index.
      * @param hash The hash to verify.
      * @param signatureData The WebAuthn signature data.
-     * @param ownerBytes The owner bytes to verify against.
-     * @return True if the signature is valid for the given owner bytes.
+     * @param ownerIndex The index of the owner to verify against.
+     * @return True if the signature is valid for the given owner index.
      */
     function _checkWebAuthnSignature(
         bytes32 hash,
         bytes memory signatureData,
-        bytes memory ownerBytes
+        uint256 ownerIndex
     )
         internal
         view
         returns (bool)
     {
-        // Check if it's a valid WebAuthn key (64 bytes) and is an owner
+        // Check if owner index is valid
+        if (ownerIndex >= nextOwnerIndex()) {
+            return false;
+        }
+
+        bytes memory ownerBytes = ownerAtIndex(ownerIndex);
+
+        // Check if it's a valid WebAuthn key (64 bytes) and is still an owner
         if (ownerBytes.length != 64 || !isOwnerBytes(ownerBytes)) {
             return false;
         }
@@ -270,5 +258,4 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
         name = "JustanAccount";
         version = "1";
     }
-
 }
