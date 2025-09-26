@@ -176,14 +176,14 @@ contract TestWrappedSignatureValidation is Test, CodeConstants {
     //     vm.assume(newOwnerPk != initialOwnerPk);
 
     //     address newOwner = vm.addr(newOwnerPk);
-        
+
     //     vm.prank(initialOwner);
     //     account.addOwnerAddress(newOwner);
 
     //     (PackedUserOperation memory userOp, bytes32 userOpHash) = preparePackedUserOp.generateSignedUserOperation(
     //         CALLDATA, newOwner, newOwnerPk, networkConfig.entryPointAddress, false
     //     );
-        
+
     //     JustanAccount.SignatureWrapper memory sigWrapper =
     //         JustanAccount.SignatureWrapper({ ownerIndex: 0, signatureData: userOp.signature });
 
@@ -194,4 +194,5 @@ contract TestWrappedSignatureValidation is Test, CodeConstants {
 
     //     assertEq(validationData, SIG_VALIDATION_FAILED);
     // }
+
 }

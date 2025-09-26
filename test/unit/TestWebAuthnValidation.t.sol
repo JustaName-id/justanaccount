@@ -6,10 +6,11 @@ import "@account-abstraction/core/Helpers.sol";
 import { IEntryPoint } from "@account-abstraction/interfaces/IEntryPoint.sol";
 import { PackedUserOperation } from "@account-abstraction/interfaces/PackedUserOperation.sol";
 import { IERC1271 } from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-import { Test, Vm, console } from "forge-std/Test.sol";
+
 import { WebAuthn } from "@solady/utils/WebAuthn.sol";
-import {FCL_Elliptic_ZZ} from "FreshCryptoLib/FCL_elliptic.sol";
-import {Base64Url} from "FreshCryptoLib/utils/Base64Url.sol";
+import { FCL_Elliptic_ZZ } from "FreshCryptoLib/FCL_elliptic.sol";
+import { Base64Url } from "FreshCryptoLib/utils/Base64Url.sol";
+import { Test, Vm } from "forge-std/Test.sol";
 
 import { DeployJustanAccount } from "../../script/DeployJustanAccount.s.sol";
 import { HelperConfig } from "../../script/HelperConfig.s.sol";
@@ -17,8 +18,10 @@ import { CodeConstants } from "../../script/HelperConfig.s.sol";
 import { PreparePackedUserOp } from "../../script/PreparePackedUserOp.s.sol";
 import { JustanAccount } from "../../src/JustanAccount.sol";
 import { JustanAccountFactory } from "../../src/JustanAccountFactory.sol";
+import { ERC7739Utils } from "../utils/ERC7739Utils.sol";
 
 library Utils {
+
     uint256 constant P256_N_DIV_2 = FCL_Elliptic_ZZ.n / 2;
 
     struct WebAuthnInfo {
@@ -31,7 +34,9 @@ library Utils {
         string memory challengeb64url = Base64Url.encode(abi.encode(challenge));
         string memory clientDataJSON = string(
             abi.encodePacked(
-                '{"type":"webauthn.get","challenge":"', challengeb64url, '","origin":"https://sign.coinbase.com","crossOrigin":false}'
+                '{"type":"webauthn.get","challenge":"',
+                challengeb64url,
+                '","origin":"https://sign.coinbase.com","crossOrigin":false}'
             )
         );
 
@@ -53,6 +58,7 @@ library Utils {
 
         return s;
     }
+
 }
 
 contract TestWebAuthnValidation is Test, CodeConstants {
@@ -79,7 +85,7 @@ contract TestWebAuthnValidation is Test, CodeConstants {
         account = factory.createAccount(owners, 0);
     }
 
-    function test_ShouldValidateWebAuthnSignature() public {       
+    function test_ShouldValidateWebAuthnSignature() public {
         (PackedUserOperation memory userOp, bytes32 userOpHash) = preparePackedUserOp.generateUnsignedUserOperation(
             CALLDATA, address(account), networkConfig.entryPointAddress, false
         );
@@ -110,30 +116,34 @@ contract TestWebAuthnValidation is Test, CodeConstants {
         assertEq(validationData, SIG_VALIDATION_SUCCESS);
     }
 
-    // function test_ShouldValidateWebAuthnSignatureString(string memory message) public {       
-    //     Utils.WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(userOpHash);
-    //     (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
-    //     s = bytes32(Utils.normalizeS(uint256(s)));
+    function test_ShouldValidateWebAuthnSignatureString(string memory message) public {
+        bytes32 personalSignHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n11", message));
 
-    //     userOp.signature = abi.encode(
-    //         JustanAccount.SignatureWrapper({
-    //             ownerIndex: 0,
-    //             signatureData: abi.encode(
-    //                 WebAuthn.WebAuthnAuth({
-    //                     authenticatorData: webAuthn.authenticatorData,
-    //                     clientDataJSON: webAuthn.clientDataJSON,
-    //                     typeIndex: 1,
-    //                     challengeIndex: 23,
-    //                     r: r,
-    //                     s: s
-    //                 })
-    //             )
-    //         })
-    //     );
+        ERC7739Utils.DomainData memory domainData = ERC7739Utils.getDomainDataFromAccount(address(account));
+        bytes32 erc7739Hash = ERC7739Utils.erc7739HashFromPersonalSignHash(personalSignHash, domainData);
 
-        // vm.prank(networkConfig.entryPointAddress);
-        // uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
+        Utils.WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(erc7739Hash);
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
 
-        // assertEq(validationData, SIG_VALIDATION_SUCCESS);
-    // }
+        bytes memory signature = abi.encode(
+            JustanAccount.SignatureWrapper({
+                ownerIndex: 0,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: r,
+                        s: s
+                    })
+                )
+            })
+        );
+
+        bytes4 result = account.isValidSignature(personalSignHash, signature);
+        assertEq(result, IERC1271.isValidSignature.selector);
+    }
+
 }

@@ -258,4 +258,5 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
         name = "JustanAccount";
         version = "1";
     }
+
 }
