@@ -8,6 +8,7 @@ import { PackedUserOperation } from "@account-abstraction/interfaces/PackedUserO
 import { IERC1271 } from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 
 import { WebAuthn } from "@solady/utils/WebAuthn.sol";
+import { P256 } from "@solady/utils/P256.sol";
 import { FCL_Elliptic_ZZ } from "FreshCryptoLib/FCL_elliptic.sol";
 import { Base64Url } from "FreshCryptoLib/utils/Base64Url.sol";
 import { Test, Vm } from "forge-std/Test.sol";
@@ -31,7 +32,9 @@ library Utils {
     }
 
     function getWebAuthnStruct(bytes32 challenge) public pure returns (WebAuthnInfo memory) {
-        string memory challengeb64url = Base64Url.encode(abi.encode(challenge));
+        bytes memory challengeBytes = abi.encode(challenge);
+        string memory challengeb64url = Base64Url.encode(challengeBytes);
+        // TODO: Change to use the correct origin
         string memory clientDataJSON = string(
             abi.encodePacked(
                 '{"type":"webauthn.get","challenge":"',
@@ -40,7 +43,6 @@ library Utils {
             )
         );
 
-        // Authenticator data for Chrome Profile touchID signature
         bytes memory authenticatorData = hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97630500000000";
 
         bytes32 clientDataJSONHash = sha256(bytes(clientDataJSON));
@@ -74,6 +76,11 @@ contract TestWebAuthnValidation is Test, CodeConstants {
     bytes CALLDATA = abi.encodeWithSignature("execute(address,uint256,bytes)", address(0), 0, "");
 
     function setUp() public {
+        // Deploy P256 verifier bytecode to the precompile addresses
+        // This is required for WebAuthn signature verification in tests
+        vm.etch(P256.RIP_PRECOMPILE, P256_VERIFIER_BYTECODE);
+        vm.etch(P256.VERIFIER, P256_VERIFIER_BYTECODE);
+
         DeployJustanAccount deployer = new DeployJustanAccount();
         (, factory, networkConfig) = deployer.run();
 
@@ -84,6 +91,10 @@ contract TestWebAuthnValidation is Test, CodeConstants {
 
         account = factory.createAccount(owners, 0);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                    VALID SIGNATURE CHECKS
+    //////////////////////////////////////////////////////////////*/
 
     function test_ShouldValidateWebAuthnSignature() public {
         (PackedUserOperation memory userOp, bytes32 userOpHash) = preparePackedUserOp.generateUnsignedUserOperation(
@@ -144,6 +155,275 @@ contract TestWebAuthnValidation is Test, CodeConstants {
 
         bytes4 result = account.isValidSignature(personalSignHash, signature);
         assertEq(result, IERC1271.isValidSignature.selector);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    INVALID OWNER INDEX TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_ShouldFailWebAuthnSignatureWithInvalidOwnerIndex(uint256 ownerIndex) public {
+        vm.assume(ownerIndex >= account.nextOwnerIndex());
+
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = preparePackedUserOp.generateUnsignedUserOperation(
+            CALLDATA, address(account), networkConfig.entryPointAddress, false
+        );
+
+        Utils.WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(userOpHash);
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+
+        userOp.signature = abi.encode(
+            JustanAccount.SignatureWrapper({
+                ownerIndex: ownerIndex,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: r,
+                        s: s
+                    })
+                )
+            })
+        );
+
+        vm.prank(networkConfig.entryPointAddress);
+        uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
+
+        assertEq(validationData, SIG_VALIDATION_FAILED);
+    }
+
+    function test_ShouldFailWebAuthnSignatureWithRemovedOwner(uint256 newOwnerPk) public {
+        uint256 P256_CURVE_ORDER = FCL_Elliptic_ZZ.n;
+        vm.assume(newOwnerPk > 0 && newOwnerPk < P256_CURVE_ORDER);
+        vm.assume(newOwnerPk != passkeyPrivateKey);
+
+        (uint256 newXUint, uint256 newYUint) = vm.publicKeyP256(newOwnerPk);
+        bytes32 newX = bytes32(newXUint);
+        bytes32 newY = bytes32(newYUint);
+        bytes memory newOwner = abi.encode(newX, newY);
+
+        vm.prank(address(account));
+        account.addOwnerPublicKey(newX, newY);
+
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = preparePackedUserOp.generateUnsignedUserOperation(
+            CALLDATA, address(account), networkConfig.entryPointAddress, false
+        );
+
+        Utils.WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(userOpHash);
+        (bytes32 r, bytes32 s) = vm.signP256(newOwnerPk, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+
+        userOp.signature = abi.encode(
+            JustanAccount.SignatureWrapper({
+                ownerIndex: 1,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: r,
+                        s: s
+                    })
+                )
+            })
+        );
+
+        vm.prank(address(account));
+        account.removeOwnerAtIndex(1, newOwner);
+
+        vm.prank(networkConfig.entryPointAddress);
+        uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
+
+        assertEq(validationData, SIG_VALIDATION_FAILED);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    WRONG OWNER/SIGNER TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_ShouldFailWebAuthnSignatureWithWrongKey(uint256 owner1Pk, uint256 owner2Pk) public {
+        uint256 P256_CURVE_ORDER = FCL_Elliptic_ZZ.n;
+        vm.assume(owner1Pk > 0 && owner1Pk < P256_CURVE_ORDER);
+        vm.assume(owner2Pk > 0 && owner2Pk < P256_CURVE_ORDER);
+        vm.assume(owner1Pk != passkeyPrivateKey);
+        vm.assume(owner2Pk != passkeyPrivateKey);
+        vm.assume(owner1Pk != owner2Pk);
+
+        (uint256 owner1XUint, uint256 owner1YUint) = vm.publicKeyP256(owner1Pk);
+        bytes32 owner1X = bytes32(owner1XUint);
+        bytes32 owner1Y = bytes32(owner1YUint);
+
+        vm.prank(address(account));
+        account.addOwnerPublicKey(owner1X, owner1Y);
+
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = preparePackedUserOp.generateUnsignedUserOperation(
+            CALLDATA, address(account), networkConfig.entryPointAddress, false
+        );
+
+        Utils.WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(userOpHash);
+        (bytes32 r, bytes32 s) = vm.signP256(owner2Pk, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+
+        userOp.signature = abi.encode(
+            JustanAccount.SignatureWrapper({
+                ownerIndex: 1,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: r,
+                        s: s
+                    })
+                )
+            })
+        );
+
+        vm.prank(networkConfig.entryPointAddress);
+        uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
+
+        assertEq(validationData, SIG_VALIDATION_FAILED);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    WEBAUTHN-SPECIFIC FIELD TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_ShouldFailWebAuthnSignatureWithWrongTypeIndex() public {
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = preparePackedUserOp.generateUnsignedUserOperation(
+            CALLDATA, address(account), networkConfig.entryPointAddress, false
+        );
+
+        Utils.WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(userOpHash);
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+
+        userOp.signature = abi.encode(
+            JustanAccount.SignatureWrapper({
+                ownerIndex: 0,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 0,
+                        challengeIndex: 23,
+                        r: r,
+                        s: s
+                    })
+                )
+            })
+        );
+
+        vm.prank(networkConfig.entryPointAddress);
+        uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
+
+        assertEq(validationData, SIG_VALIDATION_FAILED);
+    }
+
+    function test_ShouldFailWebAuthnSignatureWithWrongChallengeIndex() public {
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = preparePackedUserOp.generateUnsignedUserOperation(
+            CALLDATA, address(account), networkConfig.entryPointAddress, false
+        );
+
+        Utils.WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(userOpHash);
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+
+        userOp.signature = abi.encode(
+            JustanAccount.SignatureWrapper({
+                ownerIndex: 0,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 0,
+                        r: r,
+                        s: s
+                    })
+                )
+            })
+        );
+
+        vm.prank(networkConfig.entryPointAddress);
+        uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
+
+        assertEq(validationData, SIG_VALIDATION_FAILED);
+    }
+
+    function test_ShouldFailWebAuthnSignatureWithTamperedAuthenticatorData() public {
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = preparePackedUserOp.generateUnsignedUserOperation(
+            CALLDATA, address(account), networkConfig.entryPointAddress, false
+        );
+
+        Utils.WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(userOpHash);
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+
+        bytes memory tamperedAuthenticatorData = webAuthn.authenticatorData;
+        tamperedAuthenticatorData[0] = bytes1(uint8(tamperedAuthenticatorData[0]) ^ 0x01);
+
+        userOp.signature = abi.encode(
+            JustanAccount.SignatureWrapper({
+                ownerIndex: 0,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: tamperedAuthenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: r,
+                        s: s
+                    })
+                )
+            })
+        );
+
+        vm.prank(networkConfig.entryPointAddress);
+        uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
+
+        assertEq(validationData, SIG_VALIDATION_FAILED);
+    }
+
+    function test_ShouldFailWebAuthnSignatureWithTamperedClientDataJSON() public {
+        (PackedUserOperation memory userOp, bytes32 userOpHash) = preparePackedUserOp.generateUnsignedUserOperation(
+            CALLDATA, address(account), networkConfig.entryPointAddress, false
+        );
+
+        Utils.WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(userOpHash);
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+
+        string memory tamperedClientDataJSON = string(
+            abi.encodePacked(
+                '{"type":"webauthn.get","challenge":"tampered","origin":"https://sign.coinbase.com","crossOrigin":false}'
+            )
+        );
+
+        userOp.signature = abi.encode(
+            JustanAccount.SignatureWrapper({
+                ownerIndex: 0,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: tamperedClientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: r,
+                        s: s
+                    })
+                )
+            })
+        );
+
+        vm.prank(networkConfig.entryPointAddress);
+        uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
+
+        assertEq(validationData, SIG_VALIDATION_FAILED);
     }
 
 }
