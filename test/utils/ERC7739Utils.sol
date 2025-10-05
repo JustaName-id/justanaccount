@@ -131,9 +131,8 @@ library ERC7739Utils {
                 domainData.chainId,
                 domainData.verifyingContract
             )
-        )
+        );
         // Note: No salt - Solady EIP712 doesn't use salt
-        ;
     }
 
 }

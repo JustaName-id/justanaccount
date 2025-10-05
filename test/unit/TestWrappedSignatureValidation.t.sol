@@ -67,7 +67,7 @@ contract TestWrappedSignatureValidation is Test, CodeConstants {
             JustanAccount.SignatureWrapper({ ownerIndex: 1, signatureData: userOp.signature });
 
         userOp.signature = abi.encode(sigWrapper);
-        
+
         vm.prank(initialOwner);
         account.removeOwnerAtIndex(1, abi.encode(newOwner));
 
@@ -152,4 +152,5 @@ contract TestWrappedSignatureValidation is Test, CodeConstants {
 
         assertEq(validationData, SIG_VALIDATION_FAILED);
     }
+
 }
