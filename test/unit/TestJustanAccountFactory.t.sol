@@ -72,7 +72,7 @@ contract TestJustanAccountFactory is Test {
         assertEq(address(a), address(b));
     }
 
-    function testDeployDeterministicPassValues() public {
+    function test_DeployDeterministicPassValues() public {
         vm.deal(address(this), 1e18);
         JustanAccount a = factory.createAccount{ value: 1e18 }(owners, 0);
         assertEq(address(a).balance, 1e18);

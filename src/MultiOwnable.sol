@@ -19,9 +19,7 @@ struct MultiOwnableStorage {
      *
      * The `owner` bytes should be:
      *  - An ABI encoded Ethereum address (20 bytes)
-     *
-     * The design allows for future expansion to support other types of owners,
-     * such as public keys (64 bytes).
+     *  - A public key (64 bytes)
      */
     mapping(uint256 index => bytes owner) s_ownerAtIndex;
     /**
