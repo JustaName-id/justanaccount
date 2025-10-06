@@ -17,6 +17,8 @@ import { DeployJustanAccount } from "../../script/DeployJustanAccount.s.sol";
 import { HelperConfig } from "../../script/HelperConfig.s.sol";
 import { CodeConstants } from "../../script/HelperConfig.s.sol";
 import { JustanAccount } from "../../src/JustanAccount.sol";
+import { JustanAccountFactory } from "../../src/JustanAccountFactory.sol";
+import { MultiOwnable } from "../../src/MultiOwnable.sol";
 
 contract ERC721Mock is ERC721 {
 
@@ -41,6 +43,7 @@ contract ERC1155Mock is ERC1155 {
 contract TestGeneralJustanAccount is Test, CodeConstants {
 
     JustanAccount public justanAccount;
+    JustanAccountFactory public factory;
     HelperConfig public helperConfig;
 
     ERC721Mock public erc721Mock;
@@ -52,12 +55,87 @@ contract TestGeneralJustanAccount is Test, CodeConstants {
 
     function setUp() public {
         DeployJustanAccount deployer = new DeployJustanAccount();
-        (justanAccount,, networkConfig) = deployer.run();
+        (justanAccount, factory, networkConfig) = deployer.run();
 
         NFT_OWNER = makeAddr("nft_owner");
 
         erc721Mock = new ERC721Mock();
         erc1155Mock = new ERC1155Mock();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          INITIALIZATION TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_ShouldInitializeCorrectly() public {
+        address owner1 = makeAddr("owner1");
+        address owner2 = makeAddr("owner2");
+
+        bytes[] memory owners = new bytes[](2);
+        owners[0] = abi.encode(owner1);
+        owners[1] = abi.encode(owner2);
+
+        JustanAccount newAccount = factory.createAccount(owners, 123);
+
+        assertEq(newAccount.nextOwnerIndex(), 2);
+        assertEq(newAccount.ownerCount(), 2);
+        assertTrue(newAccount.isOwnerAddress(owner1));
+        assertTrue(newAccount.isOwnerAddress(owner2));
+        assertEq(newAccount.ownerAtIndex(0), abi.encode(owner1));
+        assertEq(newAccount.ownerAtIndex(1), abi.encode(owner2));
+    }
+
+    function test_ShouldFailInitializeWhenAlreadyInitialized() public {
+        address owner1 = makeAddr("owner1");
+
+        bytes[] memory owners = new bytes[](1);
+        owners[0] = abi.encode(owner1);
+
+        JustanAccount newAccount = factory.createAccount(owners, 456);
+
+        vm.expectRevert(JustanAccount.JustanAccount_AlreadyInitialized.selector);
+        newAccount.initialize(owners);
+    }
+
+    function test_ShouldRevertOnInvalidOwnerBytesLength(uint8 length) public {
+        // Valid lengths are 32 and 64, so test all other lengths
+        vm.assume(length != 32 && length != 64);
+        vm.assume(length > 0 && length < 128); // Reasonable bounds for testing
+
+        bytes memory invalidOwner = new bytes(length);
+        // Fill with some data
+        for (uint256 i = 0; i < length; i++) {
+            invalidOwner[i] = bytes1(uint8(i));
+        }
+
+        bytes[] memory owners = new bytes[](1);
+        owners[0] = invalidOwner;
+
+        vm.expectRevert(abi.encodeWithSelector(MultiOwnable.MultiOwnable_InvalidOwnerBytesLength.selector, owners[0]));
+        factory.createAccount(owners, uint256(keccak256(abi.encode(length))));
+    }
+
+    function test_ShouldRevertOnInvalidEthereumAddressOwner(uint256 invalidAddress) public {
+        vm.assume(invalidAddress > type(uint160).max);
+
+        bytes[] memory owners = new bytes[](1);
+        owners[0] = abi.encode(invalidAddress);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(MultiOwnable.MultiOwnable_InvalidEthereumAddressOwner.selector, owners[0])
+        );
+        factory.createAccount(owners, invalidAddress);
+    }
+
+    function test_ShouldAcceptValidEthereumAddressOwner(uint160 validAddress) public {
+        vm.assume(validAddress != 0);
+
+        bytes[] memory owners = new bytes[](1);
+        owners[0] = abi.encode(validAddress);
+
+        JustanAccount newAccount = factory.createAccount(owners, uint256(validAddress));
+
+        assertTrue(newAccount.isOwnerAddress(address(validAddress)));
     }
 
     /*//////////////////////////////////////////////////////////////
