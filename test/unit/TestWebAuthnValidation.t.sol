@@ -39,7 +39,7 @@ library Utils {
             abi.encodePacked(
                 '{"type":"webauthn.get","challenge":"',
                 challengeb64url,
-                '","origin":"https://sign.coinbase.com","crossOrigin":false}'
+                '","origin":"https://keys.jaw.id","crossOrigin":false}'
             )
         );
 
@@ -127,7 +127,7 @@ contract TestWebAuthnValidation is Test, CodeConstants {
         assertEq(validationData, SIG_VALIDATION_SUCCESS);
     }
 
-    function test_ShouldValidateWebAuthnSignatureString(string memory message) public {
+    function test_ShouldValidateWebAuthnPersonalSign(string memory message) public {
         bytes32 personalSignHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n11", message));
 
         ERC7739Utils.DomainData memory domainData = ERC7739Utils.getDomainDataFromAccount(address(account));
@@ -154,6 +154,44 @@ contract TestWebAuthnValidation is Test, CodeConstants {
         );
 
         bytes4 result = account.isValidSignature(personalSignHash, signature);
+        assertEq(result, IERC1271.isValidSignature.selector);
+    }
+
+    function test_ShouldValidateWebAuthnEIP712StructuredMessage() public {
+        // Create EIP-712 struct hash for Mail(address to,string contents)
+        bytes32 structHash = keccak256(
+            abi.encode(
+                keccak256("Mail(address to,string contents)"),
+                address(0x1234567890123456789012345678901234567890),
+                keccak256("Hello, EIP-712!")
+            )
+        );
+
+        // Get the account's domain data and create the EIP-712 typed data hash
+        ERC7739Utils.DomainData memory domainData = ERC7739Utils.getDomainDataFromAccount(address(account));
+        bytes32 erc7739Hash = ERC7739Utils.erc7739HashFromPersonalSignHash(structHash, domainData);
+
+        Utils.WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(erc7739Hash);
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+
+        bytes memory signature = abi.encode(
+            JustanAccount.SignatureWrapper({
+                ownerIndex: 0,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: r,
+                        s: s
+                    })
+                )
+            })
+        );
+
+        bytes4 result = account.isValidSignature(structHash, signature);
         assertEq(result, IERC1271.isValidSignature.selector);
     }
 
