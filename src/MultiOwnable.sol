@@ -15,7 +15,7 @@ struct MultiOwnableStorage {
      */
     uint256 s_removedOwnersCount;
     /**
-     * @dev Maps index to owner bytes, used to idenfitied owners via a uint256 index.
+     * @dev Maps index to owner bytes, used to identify owners via a uint256 index.
      *
      * The `owner` bytes should be:
      *  - An ABI encoded Ethereum address (20 bytes)
@@ -72,7 +72,7 @@ contract MultiOwnable {
     error MultiOwnable_NotLastOwner(uint256 ownersRemaining);
 
     /**
-     * @notice Thrown when a provided owner is neither 64 bytes long (for public key) nor a ABI encoded address.
+     * @notice Thrown when a provided owner is neither 64 bytes long (for public key) nor an ABI encoded address.
      *  @param owner The invalid owner.
      */
     error MultiOwnable_InvalidOwnerBytesLength(bytes owner);
@@ -115,8 +115,9 @@ contract MultiOwnable {
     }
 
     /**
-     * @notice Checks if the sender is an owner of this contract.
-     * @dev Revert if the sender is not an owner of the contract.
+     * @notice Virtual function to check authorization for owner-restricted functions.
+     * @dev Must be overridden in derived contracts to implement actual authorization logic.
+     * @dev Should revert if the caller is not authorized.
      */
     function _checkOwnerOrEntryPoint() internal view virtual { }
 
@@ -229,9 +230,9 @@ contract MultiOwnable {
     }
 
     /**
-     * @notice Tracks the number of owners removed
-     * @dev Used with `this.s_nextOwnerIndex` to avoid removing all owners
-     * @return The number of owners that have been removed.
+     * @notice Returns the number of owners that have been removed.
+     * @dev Used with `s_nextOwnerIndex` to calculate the current owner count.
+     * @return The total number of owners that have been removed.
      */
     function removedOwnersCount() public view virtual returns (uint256) {
         return _getMultiOwnableStorage().s_removedOwnersCount;
@@ -308,7 +309,7 @@ contract MultiOwnable {
 
     /**
      * @notice Checks if the sender is an owner of this contract or the contract itself.
-     * @dev Revert if the sender is not an owner fo the contract itself.
+     * @dev Reverts if the sender is not an owner of the contract itself.
      */
     function _checkOwner() internal view virtual {
         if (isOwnerAddress(msg.sender) || (msg.sender == address(this))) {

@@ -57,6 +57,9 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
      */
     error JustanAccount_InvalidNonceKey(uint256 key);
 
+    /**
+     * @notice Wraps a signature with the owner index for multi-owner validation.
+     */
     struct SignatureWrapper {
         /// @dev The index of the owner that signed, see `MultiOwnable.ownerAtIndex`
         uint256 ownerIndex;
@@ -83,6 +86,9 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
      */
     uint256 public constant REPLAYABLE_NONCE_KEY = 9999;
 
+    /**
+     * @dev EIP-712 domain type hash used for structured data signing.
+     */
     bytes32 private constant TYPE_HASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
@@ -130,10 +136,11 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
     /**
      * @notice Validates UserOperation with cross-chain support.
      * @dev Overrides BaseAccount to handle cross-chain replayable operations.
+     * @dev For cross-chain operations, the userOpHash will be recomputed without chain ID.
      * @param userOp The user operation to validate.
-     * @param userOpHash The hash of the user operation from EntryPoint.
-     * @param missingAccountFunds The missing account funds.
-     * @return validationData The validation result.
+     * @param userOpHash The hash of the user operation from EntryPoint (may be recomputed internally).
+     * @param missingAccountFunds The missing account funds that need to be deposited.
+     * @return validationData The validation result (0 for success, 1 for failure).
      */
     function validateUserOp(
         PackedUserOperation calldata userOp,
@@ -168,7 +175,8 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
     }
 
     /**
-     * @notice Returns entrypoint used by this account
+     * @notice Returns the entrypoint used by this account.
+     * @return The IEntryPoint contract address.
      */
     function entryPoint() public view virtual override returns (IEntryPoint) {
         return i_entryPoint;
@@ -220,7 +228,7 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
      * @notice Returns whether `functionSelector` can be called in `executeWithoutChainIdValidation`.
      *
      * @param functionSelector The function selector to check.
-     * @return `true` is the function selector is allowed to skip the chain ID validation, else `false`.
+     * @return `true` if the function selector is allowed to skip the chain ID validation, else `false`.
      */
     function canSkipChainIdValidation(bytes4 functionSelector) public pure returns (bool) {
         if (
@@ -273,7 +281,7 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
     /**
      * @dev Validates the signature using custom logic for ECDSA and WebAuthn.
      * This overrides the default ECDSA-only validation to support multiple signature types.
-     * Only handles wrapped signatures - unwrapped signatures use SignatureCheckerLib directly.
+     * Handles both unwrapped ECDSA signatures (for EIP-7702) and wrapped signatures (for multi-owner accounts).
      */
     function _erc1271IsValidSignatureNowCalldata(
         bytes32 hash,
@@ -341,7 +349,7 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
      * @param signature The WebAuthn signature data.
      * @param x The public key x coordinate.
      * @param y The public key y coordinate.
-     * @return True if signature is valid.
+     * @return True if the signature is valid for the given public key, false otherwise.
      */
     function _verifyWebAuthnSignature(
         bytes32 hash,
@@ -388,7 +396,9 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
     }
 
     /**
-     * @dev for EIP712
+     * @dev Returns the EIP-712 domain name and version for structured data signing.
+     * @return name The domain name "JustanAccount".
+     * @return version The domain version "1".
      */
     function _domainNameAndVersion()
         internal
