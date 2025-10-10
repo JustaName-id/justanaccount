@@ -194,6 +194,7 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
     {
         vm.assume(newOwner1 != owner);
         vm.assume(newOwner2 != owner);
+        vm.assume(newOwner1 != newOwner2);
 
         bytes[] memory calls = new bytes[](3);
         calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner1);
