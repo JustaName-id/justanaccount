@@ -57,8 +57,7 @@ contract TestCanSkipChainIdValidation is Test, CodeConstants {
 
         for (uint256 i = 0; i < approvedSelectors.length; i++) {
             assertTrue(
-                justanAccount.canSkipChainIdValidation(approvedSelectors[i]),
-                "Approved selector should return true"
+                justanAccount.canSkipChainIdValidation(approvedSelectors[i]), "Approved selector should return true"
             );
         }
     }

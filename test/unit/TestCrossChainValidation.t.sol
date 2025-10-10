@@ -69,10 +69,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
 
         bytes[] memory calls = new bytes[](1);
         calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
-        bytes memory callData = abi.encodeWithSelector(
-            account.executeWithoutChainIdValidation.selector,
-            calls
-        );
+        bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, calls);
 
         PackedUserOperation memory userOp = _createUserOp(address(account), nonce, callData, false);
         bytes32 userOpHash = IEntryPoint(networkConfig.entryPointAddress).getUserOpHash(userOp);
@@ -80,9 +77,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
 
         address accountEntryPoint = address(account.entryPoint());
         vm.prank(accountEntryPoint);
-        vm.expectRevert(
-            abi.encodeWithSelector(JustanAccount.JustanAccount_InvalidNonceKey.selector, wrongNonceKey)
-        );
+        vm.expectRevert(abi.encodeWithSelector(JustanAccount.JustanAccount_InvalidNonceKey.selector, wrongNonceKey));
         account.validateUserOp(userOp, userOpHash, 0);
     }
 
@@ -91,12 +86,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
         uint256 replayableNonceKey = account.REPLAYABLE_NONCE_KEY();
         uint256 replayableNonce = (replayableNonceKey << 64) | 0;
 
-        bytes memory callData = abi.encodeWithSelector(
-            account.execute.selector,
-            address(0),
-            0,
-            ""
-        );
+        bytes memory callData = abi.encodeWithSelector(account.execute.selector, address(0), 0, "");
 
         PackedUserOperation memory userOp = _createUserOp(address(account), replayableNonce, callData, false);
         bytes32 userOpHash = IEntryPoint(networkConfig.entryPointAddress).getUserOpHash(userOp);
@@ -121,10 +111,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
 
         bytes[] memory calls = new bytes[](1);
         calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
-        bytes memory callData = abi.encodeWithSelector(
-            account.executeWithoutChainIdValidation.selector,
-            calls
-        );
+        bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, calls);
 
         PackedUserOperation memory userOp = _createUserOp(address(account), replayableNonce, callData, false);
 
@@ -142,12 +129,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
     function test_ShouldSucceedWhenRegularExecuteUsesNonReplayableNonceKey() public {
         uint256 regularNonce = (0 << 64) | 0; // nonce key = 0
 
-        bytes memory callData = abi.encodeWithSelector(
-            account.execute.selector,
-            address(0),
-            0,
-            ""
-        );
+        bytes memory callData = abi.encodeWithSelector(account.execute.selector, address(0), 0, "");
 
         PackedUserOperation memory userOp = _createUserOp(address(account), regularNonce, callData, false);
         bytes32 userOpHash = IEntryPoint(networkConfig.entryPointAddress).getUserOpHash(userOp);
@@ -169,10 +151,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
 
         bytes[] memory calls = new bytes[](1);
         calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
-        bytes memory callData = abi.encodeWithSelector(
-            account.executeWithoutChainIdValidation.selector,
-            calls
-        );
+        bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, calls);
 
         PackedUserOperation memory userOp = _createUserOp(address(account), nonce, callData, false);
         bytes32 userOpHash = IEntryPoint(networkConfig.entryPointAddress).getUserOpHash(userOp);
@@ -180,9 +159,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
 
         address accountEntryPoint = address(account.entryPoint());
         vm.prank(accountEntryPoint);
-        vm.expectRevert(
-            abi.encodeWithSelector(JustanAccount.JustanAccount_InvalidNonceKey.selector, randomNonceKey)
-        );
+        vm.expectRevert(abi.encodeWithSelector(JustanAccount.JustanAccount_InvalidNonceKey.selector, randomNonceKey));
         account.validateUserOp(userOp, userOpHash, 0);
     }
 
@@ -192,10 +169,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
 
     function test_ShouldComputeHashWithoutChainId() public view {
         uint256 replayableNonce = (account.REPLAYABLE_NONCE_KEY() << 64) | 0;
-        bytes memory callData = abi.encodeWithSelector(
-            account.executeWithoutChainIdValidation.selector,
-            new bytes[](0)
-        );
+        bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, new bytes[](0));
 
         PackedUserOperation memory userOp = _createUserOp(address(account), replayableNonce, callData, false);
         bytes32 hashWithoutChainId = account.getUserOpHashWithoutChainId(userOp);
@@ -210,10 +184,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
 
     function test_ShouldComputeDifferentHashThanRegularUserOpHash() public view {
         uint256 replayableNonce = (account.REPLAYABLE_NONCE_KEY() << 64) | 0;
-        bytes memory callData = abi.encodeWithSelector(
-            account.executeWithoutChainIdValidation.selector,
-            new bytes[](0)
-        );
+        bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, new bytes[](0));
 
         PackedUserOperation memory userOp = _createUserOp(address(account), replayableNonce, callData, false);
 
@@ -226,10 +197,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
 
     function test_ShouldProduceSameHashOnDifferentChains() public {
         uint256 replayableNonce = (account.REPLAYABLE_NONCE_KEY() << 64) | 0;
-        bytes memory callData = abi.encodeWithSelector(
-            account.executeWithoutChainIdValidation.selector,
-            new bytes[](0)
-        );
+        bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, new bytes[](0));
 
         PackedUserOperation memory userOp = _createUserOp(address(account), replayableNonce, callData, false);
 
@@ -258,10 +226,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
 
         bytes[] memory calls = new bytes[](1);
         calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
-        bytes memory callData = abi.encodeWithSelector(
-            account.executeWithoutChainIdValidation.selector,
-            calls
-        );
+        bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, calls);
 
         // Create and sign UserOp on chain 1
         vm.chainId(1);
@@ -289,7 +254,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
         assertEq(validationData2, SIG_VALIDATION_SUCCESS);
 
         // Switch to chain 42161 (Arbitrum) and validate again
-        vm.chainId(42161);
+        vm.chainId(42_161);
         bytes32 crossChainHash3 = account.getUserOpHashWithoutChainId(userOp);
         assertEq(crossChainHash, crossChainHash3);
 
@@ -303,10 +268,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
 
         bytes[] memory calls = new bytes[](1);
         calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
-        bytes memory callData = abi.encodeWithSelector(
-            account.executeWithoutChainIdValidation.selector,
-            calls
-        );
+        bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, calls);
 
         PackedUserOperation memory userOp = _createUserOp(address(account), replayableNonce, callData, false);
         bytes32 crossChainHash = account.getUserOpHashWithoutChainId(userOp);
@@ -327,10 +289,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
 
         bytes[] memory calls = new bytes[](1);
         calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
-        bytes memory callData = abi.encodeWithSelector(
-            account.executeWithoutChainIdValidation.selector,
-            calls
-        );
+        bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, calls);
 
         PackedUserOperation memory userOp = _createUserOp(address(account), replayableNonce, callData, false);
         bytes32 crossChainHash = account.getUserOpHashWithoutChainId(userOp);
@@ -339,10 +298,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
         // Tamper with the calldata after signing
         bytes[] memory tamperedCalls = new bytes[](1);
         tamperedCalls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("attacker"));
-        userOp.callData = abi.encodeWithSelector(
-            account.executeWithoutChainIdValidation.selector,
-            tamperedCalls
-        );
+        userOp.callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, tamperedCalls);
 
         // Recompute hash with tampered data
         bytes32 tamperedHash = account.getUserOpHashWithoutChainId(userOp);
@@ -366,10 +322,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
 
         bytes[] memory calls = new bytes[](1);
         calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
-        bytes memory callData = abi.encodeWithSelector(
-            justanAccount.executeWithoutChainIdValidation.selector,
-            calls
-        );
+        bytes memory callData = abi.encodeWithSelector(justanAccount.executeWithoutChainIdValidation.selector, calls);
 
         // Sign on chain 1
         vm.chainId(1);
@@ -410,10 +363,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
 
         bytes[] memory calls = new bytes[](1);
         calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
-        bytes memory callData = abi.encodeWithSelector(
-            passkeyAccount.executeWithoutChainIdValidation.selector,
-            calls
-        );
+        bytes memory callData = abi.encodeWithSelector(passkeyAccount.executeWithoutChainIdValidation.selector, calls);
 
         // Create UserOp on chain 1
         vm.chainId(1);
@@ -480,12 +430,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
         bytes memory ecdsaSignature = abi.encodePacked(r, s, v);
 
         // Wrap the signature for factory accounts (owner at index 0)
-        return abi.encode(
-            JustanAccount.SignatureWrapper({
-                ownerIndex: 0,
-                signatureData: ecdsaSignature
-            })
-        );
+        return abi.encode(JustanAccount.SignatureWrapper({ ownerIndex: 0, signatureData: ecdsaSignature }));
     }
 
     function _signWebAuthn(

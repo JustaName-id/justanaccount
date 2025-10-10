@@ -152,35 +152,27 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
     }
 
     function test_ShouldRevertWithDisallowedSelector_Execute() public {
-        bytes memory executeCall = abi.encodeWithSelector(
-            account.execute.selector, address(0), 0, ""
-        );
+        bytes memory executeCall = abi.encodeWithSelector(account.execute.selector, address(0), 0, "");
         bytes[] memory calls = new bytes[](1);
         calls[0] = executeCall;
 
         vm.prank(owner);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                JustanAccount.JustanAccount_SelectorNotAllowed.selector,
-                account.execute.selector
-            )
+            abi.encodeWithSelector(JustanAccount.JustanAccount_SelectorNotAllowed.selector, account.execute.selector)
         );
         account.executeWithoutChainIdValidation(calls);
     }
 
     function test_ShouldRevertWithDisallowedSelector_ExecuteBatch() public {
         BaseAccount.Call[] memory batchCalls = new BaseAccount.Call[](0);
-        bytes memory executeBatchCall = abi.encodeWithSelector(
-            account.executeBatch.selector, batchCalls
-        );
+        bytes memory executeBatchCall = abi.encodeWithSelector(account.executeBatch.selector, batchCalls);
         bytes[] memory calls = new bytes[](1);
         calls[0] = executeBatchCall;
 
         vm.prank(owner);
         vm.expectRevert(
             abi.encodeWithSelector(
-                JustanAccount.JustanAccount_SelectorNotAllowed.selector,
-                account.executeBatch.selector
+                JustanAccount.JustanAccount_SelectorNotAllowed.selector, account.executeBatch.selector
             )
         );
         account.executeWithoutChainIdValidation(calls);
@@ -212,9 +204,7 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
 
     function test_ShouldRevertWhenOneCallHasDisallowedSelector() public {
         address newOwner = makeAddr("newOwner");
-        bytes memory disallowedCall = abi.encodeWithSelector(
-            account.execute.selector, address(0), 0, ""
-        );
+        bytes memory disallowedCall = abi.encodeWithSelector(account.execute.selector, address(0), 0, "");
 
         bytes[] memory calls = new bytes[](2);
         calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner);
@@ -222,10 +212,7 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
 
         vm.prank(owner);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                JustanAccount.JustanAccount_SelectorNotAllowed.selector,
-                account.execute.selector
-            )
+            abi.encodeWithSelector(JustanAccount.JustanAccount_SelectorNotAllowed.selector, account.execute.selector)
         );
         account.executeWithoutChainIdValidation(calls);
 
@@ -235,9 +222,7 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
 
     function test_ShouldRevertOnFirstDisallowedSelector() public {
         address newOwner = makeAddr("newOwner");
-        bytes memory disallowedCall = abi.encodeWithSelector(
-            account.initialize.selector, new bytes[](0)
-        );
+        bytes memory disallowedCall = abi.encodeWithSelector(account.initialize.selector, new bytes[](0));
 
         bytes[] memory calls = new bytes[](2);
         calls[0] = disallowedCall;
@@ -245,10 +230,7 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
 
         vm.prank(owner);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                JustanAccount.JustanAccount_SelectorNotAllowed.selector,
-                account.initialize.selector
-            )
+            abi.encodeWithSelector(JustanAccount.JustanAccount_SelectorNotAllowed.selector, account.initialize.selector)
         );
         account.executeWithoutChainIdValidation(calls);
 
@@ -277,11 +259,7 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
     function test_ShouldPropagateRevertData() public {
         // Try to remove the last owner using removeOwnerAtIndex (should fail)
         bytes[] memory calls = new bytes[](1);
-        calls[0] = abi.encodeWithSelector(
-            MultiOwnable.removeOwnerAtIndex.selector,
-            0,
-            abi.encode(owner)
-        );
+        calls[0] = abi.encodeWithSelector(MultiOwnable.removeOwnerAtIndex.selector, 0, abi.encode(owner));
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(MultiOwnable.MultiOwnable_LastOwner.selector));
@@ -358,10 +336,7 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
 
         vm.prank(owner);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                JustanAccount.JustanAccount_SelectorNotAllowed.selector,
-                disallowedSelector
-            )
+            abi.encodeWithSelector(JustanAccount.JustanAccount_SelectorNotAllowed.selector, disallowedSelector)
         );
         account.executeWithoutChainIdValidation(calls);
     }
