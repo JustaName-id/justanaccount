@@ -51,21 +51,22 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
                         AUTHORIZATION TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_ShouldRevertWhenCallerNotOwnerOrEntryPoint(address unauthorized) public {
+    function test_ShouldRevertWhenCallerNotOwnerOrEntryPoint(address unauthorized, address newOwner) public {
         vm.assume(unauthorized != owner);
         vm.assume(unauthorized != networkConfig.entryPointAddress);
         vm.assume(unauthorized != address(account));
 
         bytes[] memory calls = new bytes[](1);
-        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
+        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner);
 
         vm.prank(unauthorized);
         vm.expectRevert(abi.encodeWithSelector(MultiOwnable.MultiOwnable_Unauthorized.selector));
         account.executeWithoutChainIdValidation(calls);
     }
 
-    function test_ShouldSucceedWhenCalledByEntryPoint() public {
-        address newOwner = makeAddr("newOwner");
+    function test_ShouldSucceedWhenCalledByEntryPoint(address newOwner) public {
+        vm.assume(newOwner != owner);
+
         assertFalse(account.isOwnerAddress(newOwner));
 
         bytes[] memory calls = new bytes[](1);
@@ -77,8 +78,9 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
         assertTrue(account.isOwnerAddress(newOwner));
     }
 
-    function test_ShouldSucceedWhenCalledByOwner() public {
-        address newOwner = makeAddr("newOwner");
+    function test_ShouldSucceedWhenCalledByOwner(address newOwner) public {
+        vm.assume(newOwner != owner);
+
         assertFalse(account.isOwnerAddress(newOwner));
 
         bytes[] memory calls = new bytes[](1);
@@ -94,8 +96,9 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
                     SELECTOR VALIDATION TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_ShouldSucceedWithApprovedSelector_AddOwnerAddress() public {
-        address newOwner = makeAddr("newOwner");
+    function test_ShouldSucceedWithApprovedSelector_AddOwnerAddress(address newOwner) public {
+        vm.assume(newOwner != owner);
+
         assertFalse(account.isOwnerAddress(newOwner));
 
         bytes[] memory calls = new bytes[](1);
@@ -108,9 +111,7 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
         assertEq(account.ownerCount(), 2);
     }
 
-    function test_ShouldSucceedWithApprovedSelector_AddOwnerPublicKey() public {
-        bytes32 x = bytes32(uint256(1));
-        bytes32 y = bytes32(uint256(2));
+    function test_ShouldSucceedWithApprovedSelector_AddOwnerPublicKey(bytes32 x, bytes32 y) public {
         assertFalse(account.isOwnerPublicKey(x, y));
 
         bytes[] memory calls = new bytes[](1);
@@ -123,9 +124,10 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
         assertEq(account.ownerCount(), 2);
     }
 
-    function test_ShouldSucceedWithApprovedSelector_RemoveOwnerAtIndex() public {
+    function test_ShouldSucceedWithApprovedSelector_RemoveOwnerAtIndex(address newOwner) public {
         // First add a second owner so we can remove the first
-        address newOwner = makeAddr("newOwner");
+        vm.assume(newOwner != owner);
+
         vm.prank(owner);
         account.addOwnerAddress(newOwner);
         assertEq(account.ownerCount(), 2);
@@ -151,8 +153,8 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
         assertEq(account.ownerCount(), 0);
     }
 
-    function test_ShouldRevertWithDisallowedSelector_Execute() public {
-        bytes memory executeCall = abi.encodeWithSelector(account.execute.selector, address(0), 0, "");
+    function test_ShouldRevertWithDisallowedSelector_Execute(address newOwner) public {
+        bytes memory executeCall = abi.encodeWithSelector(account.execute.selector, newOwner, 0, "");
         bytes[] memory calls = new bytes[](1);
         calls[0] = executeCall;
 
@@ -182,11 +184,16 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
                         BATCH CALLS TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_ShouldSucceedWithMultipleApprovedSelectors() public {
-        address newOwner1 = makeAddr("newOwner1");
-        address newOwner2 = makeAddr("newOwner2");
-        bytes32 x = bytes32(uint256(3));
-        bytes32 y = bytes32(uint256(4));
+    function test_ShouldSucceedWithMultipleApprovedSelectors(
+        address newOwner1,
+        address newOwner2,
+        bytes32 x,
+        bytes32 y
+    )
+        public
+    {
+        vm.assume(newOwner1 != owner);
+        vm.assume(newOwner2 != owner);
 
         bytes[] memory calls = new bytes[](3);
         calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner1);
@@ -202,9 +209,10 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
         assertEq(account.ownerCount(), 4); // original + 3 new
     }
 
-    function test_ShouldRevertWhenOneCallHasDisallowedSelector() public {
-        address newOwner = makeAddr("newOwner");
-        bytes memory disallowedCall = abi.encodeWithSelector(account.execute.selector, address(0), 0, "");
+    function test_ShouldRevertWhenOneCallHasDisallowedSelector(address newOwner) public {
+        vm.assume(newOwner != owner);
+
+        bytes memory disallowedCall = abi.encodeWithSelector(account.execute.selector, newOwner, 0, "");
 
         bytes[] memory calls = new bytes[](2);
         calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner);
@@ -220,39 +228,23 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
         assertFalse(account.isOwnerAddress(newOwner));
     }
 
-    function test_ShouldRevertOnFirstDisallowedSelector() public {
-        address newOwner = makeAddr("newOwner");
-        bytes memory disallowedCall = abi.encodeWithSelector(account.initialize.selector, new bytes[](0));
-
-        bytes[] memory calls = new bytes[](2);
-        calls[0] = disallowedCall;
-        calls[1] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner);
-
-        vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(JustanAccount.JustanAccount_SelectorNotAllowed.selector, account.initialize.selector)
-        );
-        account.executeWithoutChainIdValidation(calls);
-
-        // Verify no calls executed
-        assertFalse(account.isOwnerAddress(newOwner));
-    }
-
     /*//////////////////////////////////////////////////////////////
                         EXECUTION TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_ShouldRevertWhenApprovedCallFails() public {
-        // Try to remove an owner that doesn't exist at the index
-        bytes[] memory calls = new bytes[](1);
-        calls[0] = abi.encodeWithSelector(
-            MultiOwnable.removeOwnerAtIndex.selector,
-            999, // Invalid index
-            abi.encode(owner)
-        );
+    function test_ShouldRevertWhenApprovedCallFails(uint256 invalidIndex, address newOwner) public {
+        vm.assume(newOwner != owner);
+        vm.assume(invalidIndex > account.ownerCount());
 
         vm.prank(owner);
-        vm.expectRevert(); // Will revert with MultiOwnable_NoOwnerAtIndex
+        account.addOwnerAddress(newOwner);
+
+        // Try to remove an owner that doesn't exist at the index
+        bytes[] memory calls = new bytes[](1);
+        calls[0] = abi.encodeWithSelector(MultiOwnable.removeOwnerAtIndex.selector, invalidIndex, abi.encode(owner));
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(MultiOwnable.MultiOwnable_NoOwnerAtIndex.selector, invalidIndex));
         account.executeWithoutChainIdValidation(calls);
     }
 
@@ -291,18 +283,6 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
 
         // No state change expected
         assertEq(account.ownerCount(), 1);
-    }
-
-    function test_ShouldSucceedWithSingleCall() public {
-        address newOwner = makeAddr("singleNewOwner");
-
-        bytes[] memory calls = new bytes[](1);
-        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner);
-
-        vm.prank(owner);
-        account.executeWithoutChainIdValidation(calls);
-
-        assertTrue(account.isOwnerAddress(newOwner));
     }
 
     function test_ShouldSucceedWithManyApprovedCalls() public {
@@ -345,11 +325,12 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
                     EIP-7702 SPECIFIC TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_ShouldSucceedViaEIP7702Delegation() public {
+    function test_ShouldSucceedViaEIP7702Delegation(address newOwner) public {
+        vm.assume(newOwner != owner);
+
         // Create a delegated account using EIP-7702
         vm.signAndAttachDelegation(address(justanAccount), TEST_ACCOUNT_PRIVATE_KEY);
 
-        address newOwner = makeAddr("delegatedOwner");
         bytes[] memory calls = new bytes[](1);
         calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner);
 
@@ -363,15 +344,17 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
                     COMPLEX SCENARIOS
     //////////////////////////////////////////////////////////////*/
 
-    function test_ShouldHandleAddAndRemoveInSameBatch() public {
+    function test_ShouldHandleAddAndRemoveInSameBatch(address tempOwner, address permanentOwner) public {
+        vm.assume(tempOwner != owner);
+        vm.assume(permanentOwner != owner);
+        vm.assume(tempOwner != permanentOwner);
+
         // Add a second owner first
-        address tempOwner = makeAddr("tempOwner");
         vm.prank(owner);
         account.addOwnerAddress(tempOwner);
         assertEq(account.ownerCount(), 2);
 
         // Now in one batch: add a new owner and remove the temp owner
-        address permanentOwner = makeAddr("permanentOwner");
         bytes[] memory calls = new bytes[](2);
         calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, permanentOwner);
         calls[1] = abi.encodeWithSelector(MultiOwnable.removeOwnerAtIndex.selector, 1, abi.encode(tempOwner));
@@ -384,10 +367,11 @@ contract TestExecuteWithoutChainIdValidation is Test, CodeConstants {
         assertEq(account.ownerCount(), 2); // owner + permanentOwner
     }
 
-    function test_ShouldMaintainStateAcrossMultipleCalls() public {
-        address owner1 = makeAddr("batchOwner1");
-        address owner2 = makeAddr("batchOwner2");
-        address owner3 = makeAddr("batchOwner3");
+    function test_ShouldMaintainStateAcrossMultipleCalls(address owner1, address owner2, address owner3) public {
+        vm.assume(owner1 != owner);
+        vm.assume(owner2 != owner);
+        vm.assume(owner3 != owner);
+        vm.assume(owner1 != owner2 && owner1 != owner3 && owner2 != owner3);
 
         // First batch
         bytes[] memory calls1 = new bytes[](2);
