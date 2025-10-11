@@ -5,7 +5,6 @@ import { ERC1271 } from "@solady/accounts/ERC1271.sol";
 import { Receiver } from "@solady/accounts/Receiver.sol";
 import { ECDSA } from "@solady/utils/ECDSA.sol";
 import { LibBit } from "@solady/utils/LibBit.sol";
-import { SignatureCheckerLib } from "@solady/utils/SignatureCheckerLib.sol";
 import { WebAuthn } from "@solady/utils/WebAuthn.sol";
 
 import { BaseAccount } from "@account-abstraction/core/BaseAccount.sol";
