@@ -16,7 +16,7 @@
 
 ## Overview
 
-The `JustanAccount` is a Solidity smart contract designed to enhance Ethereum account functionalities by integrating support for EIP-7702 and EIP-4337. These integrations enable features such as transaction batching, gas fee sponsorship, and advanced signature validation...
+The `JustanAccount` is a Solidity smart contract designed to enhance Ethereum account functionalities by integrating support for EIP-7702 and EIP-4337. These integrations enable features such as transaction batching, gas fee sponsorship, cross-chain owner synchronization, and advanced signature validation.
 
 ## Features
 
@@ -25,6 +25,7 @@ The `JustanAccount` is a Solidity smart contract designed to enhance Ethereum ac
 - **WebAuthn Signature Support**: Full support for WebAuthn authentication. Owners can be registered as 64-byte public key coordinates (x, y) and authenticate using modern web authentication standards.
 - **ECDSA Signature Validation**: Traditional Ethereum signature support for both 64-byte and 65-byte ECDSA signatures.
 - **Transaction Batching**: Allows the execution of multiple transactions in a single call, reducing overhead and improving efficiency.
+- **Cross-Chain Owner Synchronization**: Enables replaying owner management operations across multiple chains with a single signature, ensuring consistent account configuration across all supported networks.
 - **Gas Sponsorship**: Supports mechanisms for third parties to sponsor gas fees, enabling users to interact with the Ethereum network without holding ETH.​
 - **EIP-7702 Delegation**: Can be used as a delegated implementation for existing EOA wallets, enhancing them with smart contract capabilities.
 - **EIP-4337 Account Abstraction**: Full compliance with account abstraction standards including UserOperation validation and EntryPoint integration.
@@ -35,7 +36,7 @@ The `JustanAccount` is a Solidity smart contract designed to enhance Ethereum ac
 
 ## Architecture
 
-The contract consists of two main components:
+The contract system consists of three main components:
 
 ### JustanAccount (Main Contract)
 
@@ -49,14 +50,19 @@ The primary account contract that inherits from:
 
 #### Key Components
 
+- `initialize` Function: Initializes the account with a set of initial owners. Can only be called once during account creation.
+- `validateUserOp` Function: Validates UserOperations for EIP-4337 compliance, with automatic detection of cross-chain operations based on function selector and nonce key.
 - `execute` Function: Executes a single transaction to a target address with specified value and data. Ensures that the caller is authorized (either the eoa through 7702, an account owner or the designated entry point).
 - `executeBatch` Function: Executes multiple transactions in a single call. If any transaction fails, the function reverts, indicating the index of the failed transaction.
+- `executeWithoutChainIdValidation` Function: Executes cross-chain replayable operations by calling whitelisted owner management functions. Requires REPLAYABLE_NONCE_KEY (9999) and validates each call against the approved selector list.
+- `getUserOpHashWithoutChainId` Function: Computes the UserOperation hash similar to EntryPoint v0.8, but sets chain ID to 0, enabling signature replay across different chains.
+- `canSkipChainIdValidation` Function: Returns whether a given function selector is whitelisted for cross-chain execution (owner management functions only).
 - `entryPoint` Function: Returns the entry point contract associated with this account, as required by EIP-4337.
 - `isValidSignature` Function: Validates signatures according to EIP-1271 and ERC-7739, supporting both ECDSA and WebAuthn signature schemes with nested EIP-712 replay protection.
 - `supportsInterface` Function: Indicates support for various interfaces, including ERC165, IAccount, IERC1271, IERC1155Receiver, and IERC721Receiver.
 - `_validateSignature` Function: Internal EIP-4337 signature validation for UserOperations.
-- `_checkSignature` Function: Core signature validation logic supporting multiple signature types.
-- `_checkWebAuthnSignature` Function: Validates WebAuthn signatures against all registered WebAuthn public keys.
+- `_erc1271IsValidSignatureNowCalldata` Function: Core signature validation logic supporting multiple signature types, handling both wrapped signatures (multi-owner) and unwrapped signatures (EIP-7702).
+- `_checkWebAuthnSignature` Function: Validates WebAuthn signatures for a specific owner index.
 - `_verifyWebAuthnSignature` Function: Verifies individual WebAuthn signatures using Solady's WebAuthn library.
 
 #### Signature Support
@@ -123,6 +129,28 @@ A separate contract that provides multi-owner functionality with:
 - `nextOwnerIndex()`: Returns the next index to be used for owner addition
 - `removedOwnersCount()`: Returns the number of owners that have been removed
 
+### JustanAccountFactory (Account Deployment)
+
+A factory contract for deploying JustanAccount instances with deterministic addresses across chains:
+
+- **CREATE2 Deployment**: Uses Solady's LibClone for deterministic ERC-1967 proxy deployment
+- **Cross-Chain Consistency**: Same owners and nonce produce identical addresses on all chains
+- **Efficient Clones**: Deploys minimal ERC-1967 proxies pointing to a single implementation contract
+
+#### Key Components
+
+- `createAccount(bytes[] calldata owners, uint256 nonce)`: Deploys or returns an existing account at a deterministic address. If the account already exists, skips initialization and returns the existing instance.
+- `getAddress(bytes[] calldata owners, uint256 nonce)`: Computes the deterministic address where an account would be deployed for given owners and nonce, without deploying it.
+- `initCodeHash()`: Returns the initialization code hash of the ERC-1967 proxy used for CREATE2 address computation.
+- `getImplementation()`: Returns the JustanAccount implementation address used for all deployed proxies.
+
+#### CREATE2 Salt Computation
+
+The factory uses `keccak256(abi.encode(owners, nonce))` as the CREATE2 salt, ensuring:
+- Identical addresses across all EVM chains for the same owners and nonce
+- Multiple accounts possible for the same set of owners (by varying nonce)
+- Predictable addresses before deployment for cross-chain setup
+
 ## Authorization Model
 
 The contract implements a hierarchical authorization system:
@@ -161,3 +189,11 @@ struct MultiOwnableStorage {
     mapping(bytes => bool) s_isOwner;            // Owner existence mapping
 }
 ```
+
+## Influences & Acknowledgments
+
+This implementation was influenced by and builds upon:
+
+- **[Coinbase Smart Wallet](https://github.com/coinbase/smart-wallet)**: The multi-owner architecture and cross-chain design patterns were inspired by Coinbase's smart wallet implementation.
+- **[Solady](https://github.com/Vectorized/solady)**: Core cryptographic and utility libraries including WebAuthn verification, ECDSA signature handling, ERC-1271 with ERC-7739 support, and efficient cloning patterns.
+- **[ERC-4337 Reference Implementation](https://github.com/eth-infinitism/account-abstraction)**: Account abstraction standards and EntryPoint integration patterns.

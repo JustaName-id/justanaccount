@@ -8,7 +8,7 @@ import { JustanAccount } from "./JustanAccount.sol";
 contract JustanAccountFactory {
 
     /**
-     * Address of the JustanAccount implementation used as implementation for new accounts.
+     * @notice Address of the JustanAccount implementation used as implementation for new accounts.
      */
     address private immutable i_implementation;
 
@@ -80,6 +80,10 @@ contract JustanAccountFactory {
         return LibClone.initCodeHashERC1967(i_implementation);
     }
 
+    /**
+     * @notice Returns the implementation address used for new account deployments.
+     * @return The address of the JustanAccount implementation contract.
+     */
     function getImplementation() external view returns (address) {
         return i_implementation;
     }
