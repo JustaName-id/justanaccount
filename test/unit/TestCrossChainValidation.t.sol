@@ -48,6 +48,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
         DeployJustanAccount deployer = new DeployJustanAccount();
         (justanAccount, factory, networkConfig) = deployer.run();
 
+        // TODO: use TEST_ACCOUNT_ADDRESS from code constants
         // Create an account with an initial owner for testing
         (owner, ownerPk) = makeAddrAndKey("owner");
         bytes[] memory owners = new bytes[](1);
@@ -61,56 +62,30 @@ contract TestCrossChainValidation is Test, CodeConstants {
     /*//////////////////////////////////////////////////////////////
                     NONCE KEY VALIDATION TESTS
     //////////////////////////////////////////////////////////////*/
-
-    function test_ShouldRevertWhenExecuteWithoutChainIdValidationUsesWrongNonceKey() public {
-        // Use a non-replayable nonce key (0) for executeWithoutChainIdValidation
-        uint256 wrongNonceKey = 0;
-        uint256 nonce = (wrongNonceKey << 64) | 0;
-
-        bytes[] memory calls = new bytes[](1);
-        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
-        bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, calls);
-
-        PackedUserOperation memory userOp = _createUserOp(address(account), nonce, callData, false);
-        bytes32 userOpHash = IEntryPoint(networkConfig.entryPointAddress).getUserOpHash(userOp);
-        userOp.signature = _signUserOp(userOpHash, ownerPk);
-
-        address accountEntryPoint = address(account.entryPoint());
-        vm.prank(accountEntryPoint);
-        vm.expectRevert(abi.encodeWithSelector(JustanAccount.JustanAccount_InvalidNonceKey.selector, wrongNonceKey));
-        account.validateUserOp(userOp, userOpHash, 0);
-    }
-
-    function test_ShouldRevertWhenRegularExecuteUsesReplayableNonceKey() public {
+    function test_ShouldRevertWhenRegularExecuteUsesReplayableNonceKey(address newOwner) public {
         // Use replayable nonce key for a regular execute call
         uint256 replayableNonceKey = account.REPLAYABLE_NONCE_KEY();
         uint256 replayableNonce = (replayableNonceKey << 64) | 0;
 
-        bytes memory callData = abi.encodeWithSelector(account.execute.selector, address(0), 0, "");
+        bytes memory callData = abi.encodeWithSelector(account.execute.selector, newOwner, 0, "");
 
         PackedUserOperation memory userOp = _createUserOp(address(account), replayableNonce, callData, false);
         bytes32 userOpHash = IEntryPoint(networkConfig.entryPointAddress).getUserOpHash(userOp);
         userOp.signature = _signUserOp(userOpHash, ownerPk);
 
-        // Use the account's actual entryPoint for pranking
-        address accountEntryPoint = address(account.entryPoint());
-
-        // Setup expectRevert with the pre-computed nonce key value
         vm.expectRevert(
             abi.encodeWithSelector(JustanAccount.JustanAccount_InvalidNonceKey.selector, replayableNonceKey)
         );
-
-        // Prank MUST be right before the call, not before expectRevert
-        vm.prank(accountEntryPoint);
+        vm.prank(networkConfig.entryPointAddress);
         account.validateUserOp(userOp, userOpHash, 0);
     }
 
-    function test_ShouldSucceedWhenExecuteWithoutChainIdValidationUsesReplayableNonceKey() public {
+    function test_ShouldSucceedWhenExecuteWithoutChainIdValidationUsesReplayableNonceKey(address newOwner) public {
         // Use the correct replayable nonce key
         uint256 replayableNonce = (account.REPLAYABLE_NONCE_KEY() << 64) | 0;
 
         bytes[] memory calls = new bytes[](1);
-        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
+        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner);
         bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, calls);
 
         PackedUserOperation memory userOp = _createUserOp(address(account), replayableNonce, callData, false);
@@ -119,47 +94,60 @@ contract TestCrossChainValidation is Test, CodeConstants {
         bytes32 userOpHash = account.getUserOpHashWithoutChainId(userOp);
         userOp.signature = _signUserOp(userOpHash, ownerPk);
 
-        address accountEntryPoint = address(account.entryPoint());
-        vm.prank(accountEntryPoint);
+        vm.prank(networkConfig.entryPointAddress);
         uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
 
         assertEq(validationData, SIG_VALIDATION_SUCCESS);
     }
 
-    function test_ShouldSucceedWhenRegularExecuteUsesNonReplayableNonceKey() public {
-        uint256 regularNonce = (0 << 64) | 0; // nonce key = 0
+    function test_ShouldSucceedWhenRegularExecuteUsesNonReplayableNonceKey(
+        uint256 nonReplayableNonceKey,
+        address newOwner
+    )
+        public
+    {
+        // Ensure it's not the replayable nonce key
+        vm.assume(nonReplayableNonceKey != account.REPLAYABLE_NONCE_KEY());
+        vm.assume(nonReplayableNonceKey < (1 << 192)); // Must fit in upper 192 bits
 
-        bytes memory callData = abi.encodeWithSelector(account.execute.selector, address(0), 0, "");
+        uint256 nonReplayableNonce = (nonReplayableNonceKey << 64) | 0;
 
-        PackedUserOperation memory userOp = _createUserOp(address(account), regularNonce, callData, false);
+        bytes memory callData = abi.encodeWithSelector(account.execute.selector, newOwner, 0, "");
+
+        PackedUserOperation memory userOp = _createUserOp(address(account), nonReplayableNonce, callData, false);
         bytes32 userOpHash = IEntryPoint(networkConfig.entryPointAddress).getUserOpHash(userOp);
         userOp.signature = _signUserOp(userOpHash, ownerPk);
 
-        address accountEntryPoint = address(account.entryPoint());
-        vm.prank(accountEntryPoint);
+        vm.prank(networkConfig.entryPointAddress);
         uint256 validationData = account.validateUserOp(userOp, userOpHash, 0);
 
         assertEq(validationData, SIG_VALIDATION_SUCCESS);
     }
 
-    function test_ShouldRevertWithRandomNonceKeyForCrossChain(uint256 randomNonceKey) public {
+    function test_ShouldRevertWithNonReplayableNonceKeyForCrossChain(
+        uint256 nonReplayableNonceKey,
+        address newOwner
+    )
+        public
+    {
         // Ensure it's not the replayable nonce key
-        vm.assume(randomNonceKey != account.REPLAYABLE_NONCE_KEY());
-        vm.assume(randomNonceKey < (1 << 192)); // Must fit in upper 192 bits
+        vm.assume(nonReplayableNonceKey != account.REPLAYABLE_NONCE_KEY());
+        vm.assume(nonReplayableNonceKey < (1 << 192)); // Must fit in upper 192 bits
 
-        uint256 nonce = (randomNonceKey << 64) | 0;
+        uint256 nonReplayableNonce = (nonReplayableNonceKey << 64) | 0;
 
         bytes[] memory calls = new bytes[](1);
-        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
+        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner);
         bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, calls);
 
-        PackedUserOperation memory userOp = _createUserOp(address(account), nonce, callData, false);
+        PackedUserOperation memory userOp = _createUserOp(address(account), nonReplayableNonce, callData, false);
         bytes32 userOpHash = IEntryPoint(networkConfig.entryPointAddress).getUserOpHash(userOp);
         userOp.signature = _signUserOp(userOpHash, ownerPk);
 
-        address accountEntryPoint = address(account.entryPoint());
-        vm.prank(accountEntryPoint);
-        vm.expectRevert(abi.encodeWithSelector(JustanAccount.JustanAccount_InvalidNonceKey.selector, randomNonceKey));
+        vm.prank(networkConfig.entryPointAddress);
+        vm.expectRevert(
+            abi.encodeWithSelector(JustanAccount.JustanAccount_InvalidNonceKey.selector, nonReplayableNonceKey)
+        );
         account.validateUserOp(userOp, userOpHash, 0);
     }
 
@@ -217,15 +205,35 @@ contract TestCrossChainValidation is Test, CodeConstants {
         assertEq(hashChain2, hashChain3);
     }
 
+    function test_ShouldProduceDifferentHashesForDifferentCallData(address owner1, address owner2) public view {
+        uint256 replayableNonce = (account.REPLAYABLE_NONCE_KEY() << 64) | 0;
+
+        bytes[] memory calls1 = new bytes[](1);
+        calls1[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, owner1);
+        bytes memory callData1 = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, calls1);
+
+        bytes[] memory calls2 = new bytes[](1);
+        calls2[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, owner2);
+        bytes memory callData2 = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, calls2);
+
+        PackedUserOperation memory userOp1 = _createUserOp(address(account), replayableNonce, callData1, false);
+        PackedUserOperation memory userOp2 = _createUserOp(address(account), replayableNonce, callData2, false);
+
+        bytes32 hash1 = account.getUserOpHashWithoutChainId(userOp1);
+        bytes32 hash2 = account.getUserOpHashWithoutChainId(userOp2);
+
+        assertTrue(hash1 != hash2);
+    }
+
     /*//////////////////////////////////////////////////////////////
             CROSS-CHAIN SIGNATURE REPLAY TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_ShouldValidateSameSignatureAcrossChains() public {
+    function test_ShouldValidateSameSignatureAcrossChains(address newOwner) public {
         uint256 replayableNonce = (account.REPLAYABLE_NONCE_KEY() << 64) | 0;
 
         bytes[] memory calls = new bytes[](1);
-        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
+        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner);
         bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, calls);
 
         // Create and sign UserOp on chain 1
@@ -234,10 +242,8 @@ contract TestCrossChainValidation is Test, CodeConstants {
         bytes32 crossChainHash = account.getUserOpHashWithoutChainId(userOp);
         userOp.signature = _signUserOp(crossChainHash, ownerPk);
 
-        address accountEntryPoint = address(account.entryPoint());
-
         // Validate on chain 1
-        vm.prank(accountEntryPoint);
+        vm.prank(networkConfig.entryPointAddress);
         uint256 validationData1 = account.validateUserOp(userOp, crossChainHash, 0);
         assertEq(validationData1, SIG_VALIDATION_SUCCESS);
 
@@ -249,7 +255,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
         assertEq(crossChainHash, crossChainHash2);
 
         // Signature should still be valid
-        vm.prank(accountEntryPoint);
+        vm.prank(networkConfig.entryPointAddress);
         uint256 validationData2 = account.validateUserOp(userOp, crossChainHash2, 0);
         assertEq(validationData2, SIG_VALIDATION_SUCCESS);
 
@@ -258,16 +264,16 @@ contract TestCrossChainValidation is Test, CodeConstants {
         bytes32 crossChainHash3 = account.getUserOpHashWithoutChainId(userOp);
         assertEq(crossChainHash, crossChainHash3);
 
-        vm.prank(accountEntryPoint);
+        vm.prank(networkConfig.entryPointAddress);
         uint256 validationData3 = account.validateUserOp(userOp, crossChainHash3, 0);
         assertEq(validationData3, SIG_VALIDATION_SUCCESS);
     }
 
-    function test_ShouldFailWithWrongSignature() public {
+    function test_ShouldFailWithWrongSignature(address newOwner) public {
         uint256 replayableNonce = (account.REPLAYABLE_NONCE_KEY() << 64) | 0;
 
         bytes[] memory calls = new bytes[](1);
-        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
+        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner);
         bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, calls);
 
         PackedUserOperation memory userOp = _createUserOp(address(account), replayableNonce, callData, false);
@@ -277,18 +283,19 @@ contract TestCrossChainValidation is Test, CodeConstants {
         (, uint256 wrongPk) = makeAddrAndKey("wrongSigner");
         userOp.signature = _signUserOp(crossChainHash, wrongPk);
 
-        address accountEntryPoint = address(account.entryPoint());
-        vm.prank(accountEntryPoint);
+        vm.prank(networkConfig.entryPointAddress);
         uint256 validationData = account.validateUserOp(userOp, crossChainHash, 0);
 
         assertEq(validationData, SIG_VALIDATION_FAILED);
     }
 
-    function test_ShouldFailWithTamperedCalldata() public {
+    function test_ShouldFailWithTamperedCalldata(address newOwner, address attacker) public {
+        vm.assume(attacker != newOwner);
+
         uint256 replayableNonce = (account.REPLAYABLE_NONCE_KEY() << 64) | 0;
 
         bytes[] memory calls = new bytes[](1);
-        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
+        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner);
         bytes memory callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, calls);
 
         PackedUserOperation memory userOp = _createUserOp(address(account), replayableNonce, callData, false);
@@ -297,31 +304,45 @@ contract TestCrossChainValidation is Test, CodeConstants {
 
         // Tamper with the calldata after signing
         bytes[] memory tamperedCalls = new bytes[](1);
-        tamperedCalls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("attacker"));
+        tamperedCalls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, attacker);
         userOp.callData = abi.encodeWithSelector(account.executeWithoutChainIdValidation.selector, tamperedCalls);
 
         // Recompute hash with tampered data
         bytes32 tamperedHash = account.getUserOpHashWithoutChainId(userOp);
 
-        address accountEntryPoint = address(account.entryPoint());
-        vm.prank(accountEntryPoint);
+        vm.prank(networkConfig.entryPointAddress);
         uint256 validationData = account.validateUserOp(userOp, tamperedHash, 0);
 
         assertEq(validationData, SIG_VALIDATION_FAILED);
+    }
+
+    function test_ShouldRevertWhenValidateUserOpNotCalledByEntryPointFuzzed(address caller, address newOwner) public {
+        vm.assume(caller != networkConfig.entryPointAddress);
+
+        uint256 replayableNonce = (account.REPLAYABLE_NONCE_KEY() << 64) | 0;
+        bytes memory callData = abi.encodeWithSelector(account.execute.selector, newOwner, 0, "");
+
+        PackedUserOperation memory userOp = _createUserOp(address(account), replayableNonce, callData, false);
+        bytes32 userOpHash = IEntryPoint(networkConfig.entryPointAddress).getUserOpHash(userOp);
+        userOp.signature = _signUserOp(userOpHash, ownerPk);
+
+        vm.expectRevert("account: not from EntryPoint");
+        vm.prank(caller);
+        account.validateUserOp(userOp, userOpHash, 0);
     }
 
     /*//////////////////////////////////////////////////////////////
                     EIP-7702 SPECIFIC TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_ShouldValidateCrossChainSignatureInEIP7702Mode() public {
+    function test_ShouldValidateCrossChainSignatureInEIP7702Mode(address newOwner) public {
         // Setup EIP-7702 delegation
         vm.signAndAttachDelegation(address(justanAccount), TEST_ACCOUNT_PRIVATE_KEY);
 
         uint256 replayableNonce = (justanAccount.REPLAYABLE_NONCE_KEY() << 64) | 0;
 
         bytes[] memory calls = new bytes[](1);
-        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
+        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner);
         bytes memory callData = abi.encodeWithSelector(justanAccount.executeWithoutChainIdValidation.selector, calls);
 
         // Sign on chain 1
@@ -352,7 +373,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
                     WEBAUTHN SUPPORT TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_ShouldValidateCrossChainWebAuthnSignature() public {
+    function test_ShouldValidateCrossChainWebAuthnSignature(address newOwner) public {
         // Create account with WebAuthn owner
         bytes[] memory owners = new bytes[](1);
         owners[0] = passkeyOwner;
@@ -362,7 +383,7 @@ contract TestCrossChainValidation is Test, CodeConstants {
         uint256 replayableNonce = (passkeyAccount.REPLAYABLE_NONCE_KEY() << 64) | 0;
 
         bytes[] memory calls = new bytes[](1);
-        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, makeAddr("newOwner"));
+        calls[0] = abi.encodeWithSelector(MultiOwnable.addOwnerAddress.selector, newOwner);
         bytes memory callData = abi.encodeWithSelector(passkeyAccount.executeWithoutChainIdValidation.selector, calls);
 
         // Create UserOp on chain 1

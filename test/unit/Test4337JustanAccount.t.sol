@@ -56,6 +56,10 @@ contract Test4337JustanAccount is Test, CodeConstants {
 
     // TODO: test the payPrefund function
     function test_ShouldValidateUserOpCorrectly(bytes memory callData) public {
+        vm.assume(
+            keccak256(callData)
+                != keccak256(abi.encodeWithSelector(JustanAccount.executeWithoutChainIdValidation.selector))
+        );
         vm.signAndAttachDelegation(address(justanAccount), TEST_ACCOUNT_PRIVATE_KEY);
 
         (PackedUserOperation memory userOp, bytes32 userOpHash) =
