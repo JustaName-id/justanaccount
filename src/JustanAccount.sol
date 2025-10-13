@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity 0.8.30;
 
 import { ERC1271 } from "@solady/accounts/ERC1271.sol";
 import { Receiver } from "@solady/accounts/Receiver.sol";
