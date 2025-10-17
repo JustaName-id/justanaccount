@@ -10,10 +10,8 @@ import { SafeSingletonDeployer } from "safe-singleton-deployer-sol/src/SafeSingl
 
 contract DeployJustanAccount is Script {
 
-    address constant EXPECTED_IMPLEMENTATION = 0xbC88Ca86B15CE0136C5A92A979B86c6DdB632112;
-    address constant EXPECTED_FACTORY = 0xd4a5E8c1E9ca9F92446944A831bc5C71Fb379819;
+    address constant EXPECTED_FACTORY = 0x8F27A581d7a924C7F6c22Bb9730597fD46569f54;
 
-    bytes32 constant IMPLEMENTATION_SALT = 0x0000000000000000000000000000000000000000000000000000000000000000;
     bytes32 constant FACTORY_SALT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 
     function run() external returns (JustanAccount, JustanAccountFactory, HelperConfig.NetworkConfig memory) {
@@ -22,27 +20,16 @@ contract DeployJustanAccount is Script {
 
         console2.log("Deploying on chain ID", block.chainid);
 
-        address implementation;
         address factory;
 
         if (block.chainid == 31_337) {
             vm.startBroadcast();
-            implementation = address(new JustanAccount(config.entryPointAddress));
-            factory = address(new JustanAccountFactory(implementation));
+            factory = address(new JustanAccountFactory(config.entryPointAddress));
             vm.stopBroadcast();
         } else {
-            implementation = SafeSingletonDeployer.broadcastDeploy({
-                creationCode: type(JustanAccount).creationCode,
-                args: abi.encode(config.entryPointAddress),
-                salt: IMPLEMENTATION_SALT
-            });
-
-            console2.log("implementation", implementation);
-            assert(implementation == EXPECTED_IMPLEMENTATION);
-
             factory = SafeSingletonDeployer.broadcastDeploy({
                 creationCode: type(JustanAccountFactory).creationCode,
-                args: abi.encode(implementation),
+                args: abi.encode(config.entryPointAddress),
                 salt: FACTORY_SALT
             });
 
@@ -50,7 +37,11 @@ contract DeployJustanAccount is Script {
             assert(factory == EXPECTED_FACTORY);
         }
 
-        return (JustanAccount(payable(implementation)), JustanAccountFactory(factory), config);
+        JustanAccountFactory factoryContract = JustanAccountFactory(factory);
+        address implementation = factoryContract.getImplementation();
+        console2.log("implementation", implementation);
+
+        return (JustanAccount(payable(implementation)), factoryContract, config);
     }
 
 }

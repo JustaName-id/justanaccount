@@ -39,6 +39,11 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
     error JustanAccount_AlreadyInitialized();
 
     /**
+     * @notice Thrown when an unauthorized caller attempts to initialize the account.
+     */
+    error JustanAccount_UnauthorizedInitialization();
+
+    /**
      * @notice Thrown when a call is passed to `executeWithoutChainIdValidation` that is not allowed by
      *         `canSkipChainIdValidation`
      *
@@ -74,6 +79,12 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
     IEntryPoint private immutable i_entryPoint;
 
     /**
+     * @notice The factory authorized to initialize new account instances.
+     * @dev This is set during the contract deployment and cannot be changed later.
+     */
+    address private immutable i_factory;
+
+    /**
      * @notice Reserved nonce key (upper 192 bits of `UserOperation.nonce`) for cross-chain replayable
      *         transactions.
      *
@@ -92,11 +103,13 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
     /**
-     * @notice Initializes the JustanAccount contract with the entry point address.
+     * @notice Initializes the JustanAccount contract with the entry point and factory addresses.
      * @param entryPointAddress The address of the entry point contract.
+     * @param factory The address of the factory authorized to initialize new instances.
      */
-    constructor(address entryPointAddress) {
+    constructor(address entryPointAddress, address factory) {
         i_entryPoint = IEntryPoint(entryPointAddress);
+        i_factory = factory;
 
         // Implementation should not be initializable (does not affect proxies which use their own storage).
         bytes[] memory owners = new bytes[](1);
@@ -246,6 +259,8 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
     /**
      * @notice Initializes the JustanAccount with the provided owners.
      * @dev Reverts if the account has had at least one owner, i.e. has been initialized.
+     * @dev Only callable by the authorized factory to prevent front-running attacks on EIP-7702 delegations.
+     * @dev EIP-7702 EOAs should use addOwnerAddress() or addOwnerPublicKey() via self-calls instead.
      * @param owners Array of initial owners for this account. Each item should be
      *               an ABI encoded Ethereum address, i.e. 32 bytes with 12 leading 0 bytes,
      *               or a 64 byte public key.
@@ -253,6 +268,11 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
     function initialize(bytes[] calldata owners) external payable virtual {
         if (nextOwnerIndex() != 0) {
             revert JustanAccount_AlreadyInitialized();
+        }
+
+        // Only the factory can call initialize to prevent front-running attacks
+        if (msg.sender != i_factory) {
+            revert JustanAccount_UnauthorizedInitialization();
         }
 
         _initializeOwners(owners);

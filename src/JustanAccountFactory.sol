@@ -23,12 +23,11 @@ contract JustanAccountFactory {
     error JustanAccountFactory_AlreadyDeployed();
 
     /**
-     * @notice Factory constructor used to initialize the implementation address to use for future
-     *              JustanAccount deployments.
-     * @param implementation The address of the JustanAccount implementation.
+     * @notice Factory constructor that deploys the JustanAccount implementation.
+     * @param entryPointAddress The address of the entry point contract.
      */
-    constructor(address implementation) {
-        i_implementation = implementation;
+    constructor(address entryPointAddress) {
+        i_implementation = address(new JustanAccount(entryPointAddress, address(this)));
     }
 
     /**

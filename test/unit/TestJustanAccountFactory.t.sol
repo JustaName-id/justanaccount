@@ -14,17 +14,23 @@ contract TestJustanAccountFactory is Test {
     JustanAccountFactory factory;
     JustanAccount account;
     bytes[] owners;
+    HelperConfig helperConfig;
+    address entryPoint;
 
     function setUp() public {
-        account = new JustanAccount(address(0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108));
-        factory = new JustanAccountFactory(address(account));
+        helperConfig = new HelperConfig();
+        entryPoint = helperConfig.getConfig().entryPointAddress;
+        factory = new JustanAccountFactory(entryPoint);
+        account = JustanAccount(payable(factory.getImplementation()));
         owners.push(abi.encode(address(1)));
         owners.push(abi.encode(address(2)));
     }
 
-    function test_constructor_setsImplementation(address implementation) public {
-        factory = new JustanAccountFactory(implementation);
-        assertEq(factory.getImplementation(), implementation);
+    function test_constructor_deploysImplementation() public {
+        JustanAccountFactory newFactory = new JustanAccountFactory(entryPoint);
+        address implementation = newFactory.getImplementation();
+        assertTrue(implementation != address(0));
+        assertEq(address(JustanAccount(payable(implementation)).entryPoint()), entryPoint);
     }
 
     function test_createAccountSetsOwnersCorrectly() public {
