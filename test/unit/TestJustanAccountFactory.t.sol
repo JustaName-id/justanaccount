@@ -38,15 +38,15 @@ contract TestJustanAccountFactory is Test {
     function test_revertsIfNoOwners() public {
         owners.pop();
         owners.pop();
-        vm.expectRevert(JustanAccountFactory.OwnerRequired.selector);
+        vm.expectRevert(JustanAccountFactory.JustanAccountFactory_OwnerRequired.selector);
         factory.createAccount{ value: 1e18 }(owners, 0);
     }
 
-    function test_exitIfAccountIsAlreadyInitialized() public {
-        JustanAccount a = factory.createAccount(owners, 0);
-        vm.expectCall(address(a), abi.encodeCall(JustanAccount.initialize, (owners)), 0);
-        JustanAccount a2 = factory.createAccount(owners, 0);
-        assertEq(address(a), address(a2));
+    function test_revertsIfAccountAlreadyExists() public {
+        factory.createAccount(owners, 0);
+
+        vm.expectRevert(JustanAccountFactory.JustanAccountFactory_AlreadyDeployed.selector);
+        factory.createAccount(owners, 0);
     }
 
     function test_RevertsIfLength32ButLargerThanAddress() public {
@@ -62,14 +62,6 @@ contract TestJustanAccountFactory is Test {
         address p = factory.getAddress(owners, 0);
         JustanAccount a = factory.createAccount{ value: 1e18 }(owners, 0);
         assertEq(address(a), p);
-    }
-
-    function test_CreateAccount_ReturnsPredeterminedAddress_WhenAccountAlreadyExists() public {
-        address p = factory.getAddress(owners, 0);
-        JustanAccount a = factory.createAccount{ value: 1e18 }(owners, 0);
-        JustanAccount b = factory.createAccount{ value: 1e18 }(owners, 0);
-        assertEq(address(a), p);
-        assertEq(address(a), address(b));
     }
 
     function test_DeployDeterministicPassValues() public {

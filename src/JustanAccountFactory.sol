@@ -15,7 +15,12 @@ contract JustanAccountFactory {
     /**
      * @notice Thrown when trying to create a new account without any owner.
      */
-    error OwnerRequired();
+    error JustanAccountFactory_OwnerRequired();
+
+    /**
+     * @notice Thrown if account already deployed.
+     */
+    error JustanAccountFactory_AlreadyDeployed();
 
     /**
      * @notice Factory constructor used to initialize the implementation address to use for future
@@ -27,8 +32,8 @@ contract JustanAccountFactory {
     }
 
     /**
-     * @notice Returns the deterministic address for a JustanAccount created with `owners` and `nonce`
-     *              deploys and initializes contract if it has not yet been created.
+     * @notice Creates and returns a new JustanAccount with the given `owners` and `nonce`.
+     *         Reverts if an account with these parameters already exists.
      * @dev Deployed as a ERC-1967 proxy that's implementation is `this.implementation`.
      * @param owners Array of initial owners. Each item should be an ABI encoded address or 64 byte public key.
      * @param nonce  The nonce of the account, a caller defined value which allows multiple accounts
@@ -46,17 +51,19 @@ contract JustanAccountFactory {
         returns (JustanAccount account)
     {
         if (owners.length == 0) {
-            revert OwnerRequired();
+            revert JustanAccountFactory_OwnerRequired();
         }
 
         (bool alreadyDeployed, address accountAddress) =
             LibClone.createDeterministicERC1967(msg.value, i_implementation, _getSalt(owners, nonce));
 
+        if (alreadyDeployed) {
+            revert JustanAccountFactory_AlreadyDeployed();
+        }
+
         account = JustanAccount(payable(accountAddress));
 
-        if (!alreadyDeployed) {
-            account.initialize(owners);
-        }
+        account.initialize(owners);
     }
 
     /**

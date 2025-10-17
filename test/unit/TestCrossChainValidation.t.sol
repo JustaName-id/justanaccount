@@ -206,6 +206,8 @@ contract TestCrossChainValidation is Test, CodeConstants {
     }
 
     function test_ShouldProduceDifferentHashesForDifferentCallData(address owner1, address owner2) public view {
+        vm.assume(owner1 != owner2);
+        
         uint256 replayableNonce = (account.REPLAYABLE_NONCE_KEY() << 64) | 0;
 
         bytes[] memory calls1 = new bytes[](1);
