@@ -190,7 +190,9 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
     function getUserOpHashWithoutChainId(PackedUserOperation calldata userOp) public view virtual returns (bytes32) {
         bytes32 overrideInitCodeHash = Eip7702Support._getEip7702InitCodeHashOverride(userOp);
         return MessageHashUtils.toTypedDataHash(
-            keccak256(abi.encode(TYPE_HASH, keccak256(bytes("ERC4337")), keccak256(bytes("1")), 0, address(entryPoint()))),
+            keccak256(
+                abi.encode(TYPE_HASH, keccak256(bytes("ERC4337")), keccak256(bytes("1")), 0, address(entryPoint()))
+            ),
             userOp.hash(overrideInitCodeHash)
         );
     }
