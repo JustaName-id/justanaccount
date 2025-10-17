@@ -33,7 +33,7 @@ struct MultiOwnableStorage {
  * @title Multi Ownable
  * @notice Auth contract allowing multiple owners, each identified as bytes.
  */
-contract MultiOwnable {
+abstract contract MultiOwnable {
 
     /**
      * @notice Thrown when trying to add an already registered owner.
