@@ -33,11 +33,11 @@ contract JustanAccountFactory {
     /**
      * @notice Creates and returns a new JustanAccount with the given `owners` and `nonce`.
      *         Reverts if an account with these parameters already exists.
-     * @dev Deployed as a ERC-1967 proxy that's implementation is `this.implementation`.
+     * @dev Deployed as a minimal clone of `this.implementation`.
      * @param owners Array of initial owners. Each item should be an ABI encoded address or 64 byte public key.
      * @param nonce  The nonce of the account, a caller defined value which allows multiple accounts
      *              with the same `owners` to exist at different addresses.
-     * @return account The address of the ERC-1967 proxy created with inputs `owners`, `nonce`, and
+     * @return account The address of the minimal clone created with inputs `owners`, `nonce`, and
      *                 `this.implementation`.
      */
     function createAccount(
@@ -54,7 +54,7 @@ contract JustanAccountFactory {
         }
 
         (bool alreadyDeployed, address accountAddress) =
-            LibClone.createDeterministicERC1967(msg.value, i_implementation, _getSalt(owners, nonce));
+            LibClone.createDeterministicClone(msg.value, i_implementation, "", _getSalt(owners, nonce));
 
         if (alreadyDeployed) {
             revert JustanAccountFactory_AlreadyDeployed();
@@ -79,11 +79,11 @@ contract JustanAccountFactory {
 
     /**
      * @notice Returns the initialization code hash of the account:
-     *         a ERC1967 proxy that's implementation is `this.implementation`.
+     *         a minimal clone (EIP-1167) of `this.implementation`.
      * @return The initialization code hash.
      */
     function initCodeHash() public view virtual returns (bytes32) {
-        return LibClone.initCodeHashERC1967(i_implementation);
+        return LibClone.initCodeHash(i_implementation, "");
     }
 
     /**

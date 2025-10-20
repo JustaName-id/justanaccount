@@ -81,7 +81,7 @@ contract TestJustanAccountFactory is Test {
     }
 
     function test_initCodeHash() public view {
-        bytes32 execptedHash = LibClone.initCodeHashERC1967(address(account));
+        bytes32 execptedHash = LibClone.initCodeHash(address(account), "");
         bytes32 factoryHash = factory.initCodeHash();
         assertEq(factoryHash, execptedHash);
     }

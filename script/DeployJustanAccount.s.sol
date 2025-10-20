@@ -10,7 +10,7 @@ import { SafeSingletonDeployer } from "safe-singleton-deployer-sol/src/SafeSingl
 
 contract DeployJustanAccount is Script {
 
-    address constant EXPECTED_FACTORY = 0x8F27A581d7a924C7F6c22Bb9730597fD46569f54;
+    address constant EXPECTED_FACTORY = 0xf14356e4Fa05F56ba0820C1c959260e7e9Eb78eB;
 
     bytes32 constant FACTORY_SALT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 
