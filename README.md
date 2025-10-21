@@ -1,7 +1,5 @@
 # JustanAccount
 
-⚠️ **CAUTION: These contracts are not yet audited. Use with caution.**
-
 ## Temporary Deployment Addresses
 
 - **JustanAccountFactory**: `0x1578f4A87243bA8413ee8F5acf2af29635ED09EC`
@@ -147,6 +145,7 @@ A factory contract for deploying JustanAccount instances with deterministic addr
 #### CREATE2 Salt Computation
 
 The factory uses `keccak256(abi.encode(owners, nonce))` as the CREATE2 salt, ensuring:
+
 - Identical addresses across all EVM chains for the same owners and nonce
 - Multiple accounts possible for the same set of owners (by varying nonce)
 - Predictable addresses before deployment for cross-chain setup
