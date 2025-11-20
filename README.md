@@ -18,7 +18,7 @@ The `JustanAccount` is a Solidity smart contract designed to enhance Ethereum ac
 
 ## Features
 
-- **Multi-Owner Support**: Allows multiple owners to control the account, with flexible owner management including addition and removal of owners. This essentially allows the account to be used with advanced functionalities such as Coinbase's [SpendPermissionManager.sol](https://github.com/coinbase/spend-permissions).
+- **Multi-Owner Support**: Allows multiple owners to control the account, with flexible owner management including addition and removal of owners. This essentially allows the account to be used with advanced functionalities such as the [JustaPermissionManager.sol](https://github.com/JustaName-id/permissions).
 - **Flexible Owner Types**: Supports both Ethereum addresses (20 bytes) and WebAuthn public keys (64 bytes), with architecture designed for future owner type expansion.
 - **WebAuthn Signature Support**: Full support for WebAuthn authentication. Owners can be registered as 64-byte public key coordinates (x, y) and authenticate using modern web authentication standards.
 - **ECDSA Signature Validation**: Traditional Ethereum signature support for both 64-byte and 65-byte ECDSA signatures.
