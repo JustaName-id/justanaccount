@@ -6,6 +6,7 @@ import { Receiver } from "@solady/accounts/Receiver.sol";
 import { ECDSA } from "@solady/utils/ECDSA.sol";
 import { LibBit } from "@solady/utils/LibBit.sol";
 import { WebAuthn } from "@solady/utils/WebAuthn.sol";
+import {UUPSUpgradeable} from "@solady/utils/UUPSUpgradeable.sol";
 
 import { BaseAccount } from "@account-abstraction/core/BaseAccount.sol";
 
@@ -29,7 +30,7 @@ import { MultiOwnable } from "./MultiOwnable.sol";
  * @title JustanAccount
  * @notice This contract is to be used via EIP-7702 delegation and supports ERC-4337
  */
-contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 {
+contract JustanAccount is BaseAccount, MultiOwnable, UUPSUpgradeable, IERC165, Receiver, ERC1271 {
 
     using UserOperationLib for PackedUserOperation;
 
@@ -60,6 +61,9 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
      * @param key The invalid `UserOperation.nonce` key.
      */
     error JustanAccount_InvalidNonceKey(uint256 key);
+
+
+    error JustanAccount_InvalidImplementation(address implementation);
 
     /**
      * @notice Wraps a signature with the owner index for multi-owner validation.
@@ -175,6 +179,21 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
             if (key != REPLAYABLE_NONCE_KEY) {
                 revert JustanAccount_InvalidNonceKey(key);
             }
+            bytes[] memory calls = abi.decode(userOp.callData[4:], (bytes[]));
+            for (uint256 i; i < calls.length; i++) {
+                bytes memory callData = calls[i];
+                bytes4 selector = bytes4(callData);
+
+                if (selector == UUPSUpgradeable.upgradeToAndCall.selector) {
+                    address newImplementation;
+                    assembly {
+                        // Skip reading the first 32 bytes (length prefix) + 4 bytes (function selector)
+                        newImplementation := mload(add(callData, 36))
+                    }
+                    if (newImplementation.code.length == 0) revert JustanAccount_InvalidImplementation(newImplementation);
+                }
+            }
+            
         } else {
             if (key == REPLAYABLE_NONCE_KEY) {
                 revert JustanAccount_InvalidNonceKey(key);
@@ -250,6 +269,7 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
                 || functionSelector == MultiOwnable.addOwnerAddress.selector
                 || functionSelector == MultiOwnable.removeOwnerAtIndex.selector
                 || functionSelector == MultiOwnable.removeLastOwner.selector
+                || functionSelector == UUPSUpgradeable.upgradeToAndCall.selector
         ) {
             return true;
         }
@@ -414,6 +434,10 @@ contract JustanAccount is BaseAccount, MultiOwnable, IERC165, Receiver, ERC1271 
      */
     function _erc1271Signer() internal view virtual override returns (address) {
         return address(this);
+    }
+
+    function _authorizeUpgrade(address) internal view virtual override(UUPSUpgradeable) {
+        _requireForExecute();
     }
 
     /**

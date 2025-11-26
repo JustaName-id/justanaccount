@@ -54,7 +54,7 @@ contract JustanAccountFactory {
         }
 
         (bool alreadyDeployed, address accountAddress) =
-            LibClone.createDeterministicClone(msg.value, i_implementation, "", _getSalt(owners, nonce));
+            LibClone.createDeterministicERC1967(msg.value, i_implementation, _getSalt(owners, nonce));
 
         if (alreadyDeployed) {
             revert JustanAccountFactory_AlreadyDeployed();
@@ -83,7 +83,7 @@ contract JustanAccountFactory {
      * @return The initialization code hash.
      */
     function initCodeHash() public view virtual returns (bytes32) {
-        return LibClone.initCodeHash(i_implementation, "");
+        return LibClone.initCodeHashERC1967(i_implementation);
     }
 
     /**
