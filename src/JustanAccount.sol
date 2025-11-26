@@ -5,8 +5,9 @@ import { ERC1271 } from "@solady/accounts/ERC1271.sol";
 import { Receiver } from "@solady/accounts/Receiver.sol";
 import { ECDSA } from "@solady/utils/ECDSA.sol";
 import { LibBit } from "@solady/utils/LibBit.sol";
+
+import { UUPSUpgradeable } from "@solady/utils/UUPSUpgradeable.sol";
 import { WebAuthn } from "@solady/utils/WebAuthn.sol";
-import {UUPSUpgradeable} from "@solady/utils/UUPSUpgradeable.sol";
 
 import { BaseAccount } from "@account-abstraction/core/BaseAccount.sol";
 
@@ -61,7 +62,6 @@ contract JustanAccount is BaseAccount, MultiOwnable, UUPSUpgradeable, IERC165, R
      * @param key The invalid `UserOperation.nonce` key.
      */
     error JustanAccount_InvalidNonceKey(uint256 key);
-
 
     error JustanAccount_InvalidImplementation(address implementation);
 
@@ -190,10 +190,11 @@ contract JustanAccount is BaseAccount, MultiOwnable, UUPSUpgradeable, IERC165, R
                         // Skip reading the first 32 bytes (length prefix) + 4 bytes (function selector)
                         newImplementation := mload(add(callData, 36))
                     }
-                    if (newImplementation.code.length == 0) revert JustanAccount_InvalidImplementation(newImplementation);
+                    if (newImplementation.code.length == 0) {
+                        revert JustanAccount_InvalidImplementation(newImplementation);
+                    }
                 }
             }
-            
         } else {
             if (key == REPLAYABLE_NONCE_KEY) {
                 revert JustanAccount_InvalidNonceKey(key);
@@ -436,7 +437,7 @@ contract JustanAccount is BaseAccount, MultiOwnable, UUPSUpgradeable, IERC165, R
         return address(this);
     }
 
-    function _authorizeUpgrade(address) internal view virtual override(UUPSUpgradeable) {
+    function _authorizeUpgrade(address) internal view virtual override (UUPSUpgradeable) {
         _requireForExecute();
     }
 
