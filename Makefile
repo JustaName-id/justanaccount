@@ -37,7 +37,7 @@ ifeq ($(findstring --network mainnet,$(ARGS)),--network mainnet)
 endif
 
 ifeq ($(findstring --network sepolia,$(ARGS)),--network sepolia)
-	NETWORK_ARGS := --rpc-url $(SEPOLIA_RPC_URL) --account $(SEPOLIA_ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 11155111 --delay 30 --retries 3 -vvvv
+	NETWORK_ARGS := --rpc-url $(SEPOLIA_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 11155111 --delay 30 --retries 3 -vvvv
 endif
 
 ifeq ($(findstring --network arb-mainnet,$(ARGS)),--network arb-mainnet)
@@ -45,7 +45,7 @@ ifeq ($(findstring --network arb-mainnet,$(ARGS)),--network arb-mainnet)
 endif
 
 ifeq ($(findstring --network arb-sepolia,$(ARGS)),--network arb-sepolia)
-	NETWORK_ARGS := --rpc-url $(ARB_SEPOLIA_RPC_URL) --account $(SEPOLIA_ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 421614 -vvvv
+	NETWORK_ARGS := --rpc-url $(ARB_SEPOLIA_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 421614 -vvvv
 endif
 
 ifeq ($(findstring --network base-mainnet,$(ARGS)),--network base-mainnet)
@@ -53,7 +53,7 @@ ifeq ($(findstring --network base-mainnet,$(ARGS)),--network base-mainnet)
 endif
 
 ifeq ($(findstring --network base-sepolia,$(ARGS)),--network base-sepolia)
-	NETWORK_ARGS := --rpc-url $(BASE_SEPOLIA_RPC_URL) --account $(SEPOLIA_ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 84532 -vvvv
+	NETWORK_ARGS := --rpc-url $(BASE_SEPOLIA_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 84532 -vvvv
 endif
 
 ifeq ($(findstring --network op-mainnet,$(ARGS)),--network op-mainnet)
@@ -61,7 +61,31 @@ ifeq ($(findstring --network op-mainnet,$(ARGS)),--network op-mainnet)
 endif
 
 ifeq ($(findstring --network op-sepolia,$(ARGS)),--network op-sepolia)
-	NETWORK_ARGS := --rpc-url $(OP_SEPOLIA_RPC_URL) --account $(SEPOLIA_ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 11155420 -vvvv
+	NETWORK_ARGS := --rpc-url $(OP_SEPOLIA_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 11155420 -vvvv
+endif
+
+ifeq ($(findstring --network avax-mainnet,$(ARGS)),--network avax-mainnet)
+	NETWORK_ARGS := --rpc-url $(AVAX_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.routescan.io/v2/network/mainnet/evm/43114/etherscan --etherscan-api-key $(SNOWTRACE_API_KEY) --chain 43114 -vvvv
+endif
+
+ifeq ($(findstring --network avax-fuji,$(ARGS)),--network avax-fuji)
+	NETWORK_ARGS := --rpc-url $(AVAX_FUJI_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.routescan.io/v2/network/testnet/evm/43113/etherscan --etherscan-api-key $(SNOWTRACE_API_KEY) --chain 43113 -vvvv
+endif
+
+ifeq ($(findstring --network bsc-mainnet,$(ARGS)),--network bsc-mainnet)
+	NETWORK_ARGS := --rpc-url $(BSC_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 56 -vvvv
+endif
+
+ifeq ($(findstring --network bsc-testnet,$(ARGS)),--network bsc-testnet)
+	NETWORK_ARGS := --rpc-url $(BSC_TESTNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 97 -vvvv
+endif
+
+ifeq ($(findstring --network linea-mainnet,$(ARGS)),--network linea-mainnet)
+	NETWORK_ARGS := --rpc-url $(LINEA_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 59144 -vvvv
+endif
+
+ifeq ($(findstring --network linea-sepolia,$(ARGS)),--network linea-sepolia)
+	NETWORK_ARGS := --rpc-url $(LINEA_SEPOLIA_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 59141 -vvvv
 endif
 
 deploy-mainnet:
@@ -86,4 +110,22 @@ deploy-arb-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)	
 
 deploy-arb-sepolia:
+	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
+
+deploy-avax-mainnet:
+	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
+
+deploy-avax-fuji:
+	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
+
+deploy-bsc-mainnet:
+	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
+
+deploy-bsc-testnet:
+	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
+
+deploy-linea-mainnet:
+	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
+
+deploy-linea-sepolia:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
