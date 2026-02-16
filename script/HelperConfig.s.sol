@@ -55,9 +55,9 @@ contract HelperConfig is CodeConstants, Script {
     function isSupportedChain(uint256 chainId) public pure returns (bool) {
         return chainId == ETH_SEPOLIA_CHAIN_ID || chainId == MAINNET_ETH_CHAIN_ID || chainId == BASE_CHAIN_ID
             || chainId == BASE_SEPOLIA_CHAIN_ID || chainId == OPTIMISM_CHAIN_ID || chainId == OPTIMISM_SEPOLIA_CHAIN_ID
-            || chainId == ARBITRUM_ONE_CHAIN_ID || chainId == ARBITRUM_SEPOLIA_CHAIN_ID || chainId == AVALANCHE_CHAIN_ID || chainId == AVALANCHE_FUJI_CHAIN_ID
-            || chainId == BSC_CHAIN_ID || chainId == BSC_TESTNET_CHAIN_ID || chainId == LINEA_CHAIN_ID
-            || chainId == LINEA_SEPOLIA_CHAIN_ID;
+            || chainId == ARBITRUM_ONE_CHAIN_ID || chainId == ARBITRUM_SEPOLIA_CHAIN_ID || chainId == AVALANCHE_CHAIN_ID
+            || chainId == AVALANCHE_FUJI_CHAIN_ID || chainId == BSC_CHAIN_ID || chainId == BSC_TESTNET_CHAIN_ID
+            || chainId == LINEA_CHAIN_ID || chainId == LINEA_SEPOLIA_CHAIN_ID;
     }
 
     function getConfigByChainId(uint256 chainId) public returns (NetworkConfig memory) {
