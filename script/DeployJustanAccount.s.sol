@@ -10,9 +10,9 @@ import { SafeSingletonDeployer } from "safe-singleton-deployer-sol/src/SafeSingl
 
 contract DeployJustanAccount is Script {
 
-    address constant EXPECTED_FACTORY = 0xf14356e4Fa05F56ba0820C1c959260e7e9Eb78eB;
+    address constant EXPECTED_FACTORY = 0x5803c076563C85799989d42Fc00292A8aE52fa9E;
 
-    bytes32 constant FACTORY_SALT = 0x0000000000000000000000000000000000000000000000000000000000000000;
+    bytes32 constant FACTORY_SALT = 0x0000000000000000000000000000000000000000000000000000000000000001;
 
     function run() external returns (JustanAccount, JustanAccountFactory, HelperConfig.NetworkConfig memory) {
         HelperConfig helperConfig = new HelperConfig();

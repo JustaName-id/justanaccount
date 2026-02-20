@@ -1,16 +1,21 @@
 # JustanAccount
 
-## Temporary Deployment Addresses
+## Deployment Addresses
 
-- **JustanAccountFactory**: `0x1578f4A87243bA8413ee8F5acf2af29635ED09EC`
-- **JustanAccount**: `0x2F107ca67d8D32eD8decEB5189b12093ce3E602F`
+- **JustanAccountFactory**: `0x5803c076563C85799989d42Fc00292A8aE52fa9E`
+- **JustanAccount**: `0xbb4f7d5418Cd8DADB61bb95561179e517572cBCd`
 
 **Deployed on:**
 
-- Ethereum Mainnet + Sepolia
-- Base Mainnet + Sepolia
-- Optimism Mainnet + Sepolia
-- Arbitrum One + Sepolia
+| Network | Chain ID | Testnet | Chain ID |
+|---------|----------|---------|----------|
+| Ethereum Mainnet | 1 | Sepolia | 11155111 |
+| Base | 8453 | Base Sepolia | 84532 |
+| Optimism | 10 | OP Sepolia | 11155420 |
+| Arbitrum One | 42161 | Arbitrum Sepolia | 421614 |
+| BSC | 56 | BSC Testnet | 97 |
+| Linea | 59144 | Linea Sepolia | 59141 |
+| Avalanche | 43114 | Avalanche Fuji | 43113 |
 
 ## Overview
 
