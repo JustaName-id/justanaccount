@@ -16,6 +16,7 @@
 | BSC | 56 | BSC Testnet | 97 |
 | Linea | 59144 | Linea Sepolia | 59141 |
 | Avalanche | 43114 | Avalanche Fuji | 43113 |
+| Celo | 42220 | Celo Sepolia | 11142220 |
 
 ## Overview
 
