@@ -89,11 +89,19 @@ ifeq ($(findstring --network linea-sepolia,$(ARGS)),--network linea-sepolia)
 endif
 
 ifeq ($(findstring --network celo-mainnet,$(ARGS)),--network celo-mainnet)
-	NETWORK_ARGS := --rpc-url $(CELO_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 42220 -vvvv
+	NETWORK_ARGS := --rpc-url $(CELO_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --etherscan-api-version v2 --chain 42220 -vvvv
 endif
 
 ifeq ($(findstring --network celo-sepolia,$(ARGS)),--network celo-sepolia)
-	NETWORK_ARGS := --rpc-url $(CELO_SEPOLIA_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 11142220 -vvvv
+	NETWORK_ARGS := --rpc-url $(CELO_SEPOLIA_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --etherscan-api-version v2 --chain 11142220 -vvvv
+endif
+
+ifeq ($(findstring --network flare-mainnet,$(ARGS)),--network flare-mainnet)
+	NETWORK_ARGS := --rpc-url $(FLARE_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier blockscout --verifier-url https://flare-explorer.flare.network/api --chain 14 -vvvv
+endif
+
+ifeq ($(findstring --network flare-coston2,$(ARGS)),--network flare-coston2)
+	NETWORK_ARGS := --rpc-url $(FLARE_COSTON2_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier blockscout --verifier-url https://coston2-explorer.flare.network/api --chain 114 -vvvv
 endif
 
 deploy-mainnet:
@@ -142,4 +150,10 @@ deploy-celo-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
 
 deploy-celo-sepolia:
+	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
+
+deploy-flare-mainnet:
+	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
+
+deploy-flare-coston2:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
