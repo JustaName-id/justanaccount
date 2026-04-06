@@ -19,6 +19,7 @@
 | Celo | 42220 | Celo Sepolia | 11142220 |
 | Flare | 14 | Flare Testnet (Coston2) | 114 |
 | Ink | 57073 | Ink Sepolia | 763373 |
+| DOS Chain | 7979 | - | - |
 
 ## Overview
 
