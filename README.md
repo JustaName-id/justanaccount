@@ -7,19 +7,20 @@
 
 **Deployed on:**
 
-| Network | Chain ID | Testnet | Chain ID |
-|---------|----------|---------|----------|
-| Ethereum Mainnet | 1 | Sepolia | 11155111 |
-| Base | 8453 | Base Sepolia | 84532 |
-| Optimism | 10 | OP Sepolia | 11155420 |
-| Arbitrum One | 42161 | Arbitrum Sepolia | 421614 |
-| BSC | 56 | BSC Testnet | 97 |
-| Linea | 59144 | Linea Sepolia | 59141 |
-| Avalanche | 43114 | Avalanche Fuji | 43113 |
-| Celo | 42220 | Celo Sepolia | 11142220 |
-| Flare | 14 | Flare Testnet (Coston2) | 114 |
-| Ink | 57073 | Ink Sepolia | 763373 |
-| DOS Chain | 7979 | - | - |
+| Network          | Chain ID | Testnet                 | Chain ID |
+| ---------------- | -------- | ----------------------- | -------- |
+| Ethereum Mainnet | 1        | Sepolia                 | 11155111 |
+| Base             | 8453     | Base Sepolia            | 84532    |
+| Optimism         | 10       | OP Sepolia              | 11155420 |
+| Arbitrum One     | 42161    | Arbitrum Sepolia        | 421614   |
+| BSC              | 56       | BSC Testnet             | 97       |
+| Linea            | 59144    | Linea Sepolia           | 59141    |
+| Avalanche        | 43114    | Avalanche Fuji          | 43113    |
+| Celo             | 42220    | Celo Sepolia            | 11142220 |
+| Flare            | 14       | Flare Testnet (Coston2) | 114      |
+| Ink              | 57073    | Ink Sepolia             | 763373   |
+| DOS Chain        | 7979     | -                       | -        |
+| Gnosis           | 100      | -                       | -        |
 
 ## Overview
 
@@ -77,7 +78,6 @@ The primary account contract that inherits from:
 The contract supports multiple signature schemes:
 
 1. **ECDSA Signatures** (64 or 65 bytes):
-
    - Standard Ethereum signatures
    - Validates against registered address owners
    - Validates against the account address itself (for EIP-7702 delegation)
@@ -93,18 +93,15 @@ The contract supports multiple signature schemes:
 The contract implements ERC-7739 (Readable Typed Signatures for Smart Accounts) through Solady's ERC1271 base contract, providing:
 
 1. **Nested EIP-712 Support**:
-
    - Prevents signature replay attacks across different smart accounts
    - Maintains readable typed data for wallet UIs
    - Supports both TypedDataSign and PersonalSign workflows
 
 2. **Automatic Detection**:
-
    - Returns magic value `0x77390001` when called with hash `0x7739...7739`
    - Enables wallets to detect ERC-7739 support automatically
 
 3. **Security Features**:
-
    - Domain separator includes contract address and chain ID
    - Defensive rehashing prevents cross-account signature reuse
    - Compatible with existing EIP-712 wallet infrastructure
@@ -164,12 +161,10 @@ The factory uses `keccak256(abi.encode(owners, nonce))` as the CREATE2 salt, ens
 The contract implements a hierarchical authorization system:
 
 1. **Primary Authorization**:
-
    - EOA owner through EIP-7702 delegation (`msg.sender == address(this)`)
    - EIP-4337 EntryPoint for UserOperations
 
 2. **Secondary Authorization**:
-
    - Registered Ethereum address owners
    - Registered WebAuthn public key owners
 

@@ -116,6 +116,10 @@ ifeq ($(findstring --network dos-mainnet,$(ARGS)),--network dos-mainnet)
 	NETWORK_ARGS := --rpc-url $(DOS_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier blockscout --verifier-url https://doscan.io/api --chain 7979 -vvvv
 endif
 
+ifeq ($(findstring --network gnosis-mainnet,$(ARGS)),--network gnosis-mainnet)
+	NETWORK_ARGS := --rpc-url $(GNOSIS_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier blockscout --verifier-url https://gnosis.blockscout.com/api --chain 100 -vvvv
+endif
+
 deploy-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
 
@@ -177,4 +181,7 @@ deploy-ink-sepolia:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
 
 deploy-dos-mainnet:
+	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
+
+deploy-gnosis-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
