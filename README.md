@@ -22,6 +22,7 @@
 | DOS Chain        | 7979     | -                       | -        |
 | Gnosis           | 100      | -                       | -        |
 | -                | -        | Arc Testnet             | 5042002  |
+| Polygon          | 137      | Amoy                    | 80002    |
 
 ## Overview
 
