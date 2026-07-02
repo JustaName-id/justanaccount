@@ -132,6 +132,10 @@ ifeq ($(findstring --network polygon-amoy,$(ARGS)),--network polygon-amoy)
 	NETWORK_ARGS := --rpc-url $(POLYGON_AMOY_RPC_URL) --account $(ACCOUNT) --broadcast --verify --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 80002 -vvvv
 endif
 
+ifeq ($(findstring --network robinhood-mainnet,$(ARGS)),--network robinhood-mainnet)
+	NETWORK_ARGS := --rpc-url $(ROBINHOOD_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier blockscout --verifier-url https://robinhoodchain.blockscout.com/api --chain 4663 -vvvv
+endif
+
 deploy-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
 
@@ -205,4 +209,7 @@ deploy-polygon-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
 
 deploy-polygon-amoy:
+	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
+
+deploy-robinhood-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)

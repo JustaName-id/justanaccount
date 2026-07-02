@@ -23,6 +23,7 @@
 | Gnosis           | 100      | -                       | -        |
 | -                | -        | Arc Testnet             | 5042002  |
 | Polygon          | 137      | Amoy                    | 80002    |
+| Robinhood Chain  | 4663     | -                       | -        |
 
 ## Overview
 
