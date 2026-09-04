@@ -144,6 +144,10 @@ ifeq ($(findstring --network hyvechain-mainnet,$(ARGS)),--network hyvechain-main
 	NETWORK_ARGS := --rpc-url $(HYVECHAIN_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier blockscout --verifier-url https://explorer.hyvechain.com/api --chain 7847 -vvvv
 endif
 
+ifeq ($(findstring --network unichain-mainnet,$(ARGS)),--network unichain-mainnet)
+	NETWORK_ARGS := --rpc-url $(UNICHAIN_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 130 -vvvv
+endif
+
 deploy-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
 
@@ -226,4 +230,7 @@ deploy-soneium-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
 
 deploy-hyvechain-mainnet:
+	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
+
+deploy-unichain-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
