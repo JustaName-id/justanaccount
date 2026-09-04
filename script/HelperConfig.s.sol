@@ -53,6 +53,8 @@ abstract contract CodeConstants {
 
     uint256 public constant HYVECHAIN_CHAIN_ID = 7847;
 
+    uint256 public constant UNICHAIN_CHAIN_ID = 130;
+
     // Address of the v0.8 EntryPoint contract
     address public constant ENTRYPOINT_ADDRESS = 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108;
 
@@ -86,7 +88,7 @@ contract HelperConfig is CodeConstants, Script {
             || chainId == INK_CHAIN_ID || chainId == INK_SEPOLIA_CHAIN_ID || chainId == DOS_CHAIN_ID
             || chainId == GNOSIS_CHAIN_ID || chainId == ARC_TESTNET_CHAIN_ID || chainId == POLYGON_CHAIN_ID
             || chainId == POLYGON_AMOY_CHAIN_ID || chainId == ROBINHOOD_CHAIN_ID || chainId == SONEIUM_CHAIN_ID
-            || chainId == HYVECHAIN_CHAIN_ID;
+            || chainId == HYVECHAIN_CHAIN_ID || chainId == UNICHAIN_CHAIN_ID;
     }
 
     function getConfigByChainId(uint256 chainId) public returns (NetworkConfig memory) {
