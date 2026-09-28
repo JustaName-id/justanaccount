@@ -156,6 +156,10 @@ ifeq ($(findstring --network monad-mainnet,$(ARGS)),--network monad-mainnet)
 	NETWORK_ARGS := --rpc-url $(MONAD_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 143 -vvvv
 endif
 
+ifeq ($(findstring --network citrea-mainnet,$(ARGS)),--network citrea-mainnet)
+	NETWORK_ARGS := --rpc-url $(CITREA_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier blockscout --verifier-url https://explorer.mainnet.citrea.xyz/api --chain 4114 -vvvv
+endif
+
 deploy-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
 
@@ -247,4 +251,7 @@ deploy-unichain-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
 
 deploy-monad-mainnet:
+	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
+
+deploy-citrea-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
