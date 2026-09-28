@@ -156,6 +156,10 @@ ifeq ($(findstring --network monad-mainnet,$(ARGS)),--network monad-mainnet)
 	NETWORK_ARGS := --rpc-url $(MONAD_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 143 -vvvv
 endif
 
+ifeq ($(findstring --network hyperevm-mainnet,$(ARGS)),--network hyperevm-mainnet)
+	NETWORK_ARGS := --rpc-url $(HYPEREVM_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier-url https://api.etherscan.io/v2/api --etherscan-api-key $(ETHERSCAN_API_KEY) --chain 999 -vvvv
+endif
+
 deploy-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
 
@@ -247,4 +251,7 @@ deploy-unichain-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
 
 deploy-monad-mainnet:
+	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
+
+deploy-hyperevm-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
