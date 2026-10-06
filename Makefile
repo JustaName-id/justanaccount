@@ -160,6 +160,10 @@ ifeq ($(findstring --network citrea-mainnet,$(ARGS)),--network citrea-mainnet)
 	NETWORK_ARGS := --rpc-url $(CITREA_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier blockscout --verifier-url https://explorer.mainnet.citrea.xyz/api --chain 4114 -vvvv
 endif
 
+ifeq ($(findstring --network adi-mainnet,$(ARGS)),--network adi-mainnet)
+	NETWORK_ARGS := --rpc-url $(ADI_MAINNET_RPC_URL) --account $(ACCOUNT) --broadcast --verify --verifier custom --verifier-url https://explorer-api.adifoundation.ai/api --verifier-api-key $(ETHERSCAN_API_KEY) --chain 36900 -vvvv
+endif
+
 deploy-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
 
@@ -254,4 +258,7 @@ deploy-monad-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
 
 deploy-citrea-mainnet:
+	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
+
+deploy-adi-mainnet:
 	@forge script script/DeployJustanAccount.s.sol:DeployJustanAccount $(NETWORK_ARGS)
